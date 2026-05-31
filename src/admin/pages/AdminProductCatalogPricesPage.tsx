@@ -20,6 +20,7 @@ type DraftPriceRow = {
   unitId: number;
   currentValue: number;
   referencePrice: number;
+  displayName: string;
   productVariantId?: number | null;
   variantSkuLabel?: string | null;
   variantOptionValues?: Record<string, string> | null;
@@ -42,6 +43,7 @@ function rowsFromPrices(prices: ProductPrice[], defaultUnitId: number): DraftPri
       unitId: pr.unitId,
       currentValue: pr.currentValue,
       referencePrice: pr.oldValue ?? 0,
+      displayName: pr.displayName ?? '',
       ...variantFieldsFromPrice(pr),
     }));
   }
@@ -50,6 +52,7 @@ function rowsFromPrices(prices: ProductPrice[], defaultUnitId: number): DraftPri
     unitId: defaultUnitId,
     currentValue: 0,
     referencePrice: 0,
+    displayName: '',
     productVariantId: null,
     variantSkuLabel: null,
     variantOptionValues: null,
@@ -65,6 +68,7 @@ function emptyPriceDraftRow(
     unitId: defaultUnitId,
     currentValue: 0,
     referencePrice: 0,
+    displayName: '',
     productVariantId: opts?.productVariantId ?? null,
     variantSkuLabel: opts?.variantSkuLabel ?? null,
     variantOptionValues: opts?.variantOptionValues ?? null,
@@ -258,6 +262,7 @@ export default function AdminProductCatalogPricesPage() {
         unitId: Math.round(Number(r.unitId)),
         currentValue: Math.round(Number(r.currentValue)),
         oldValue: Math.round(Number(r.referencePrice) || 0),
+        displayName: r.displayName,
         productVariantId:
           r.productVariantId != null && Number(r.productVariantId) > 0
             ? Math.round(Number(r.productVariantId))
@@ -282,6 +287,11 @@ export default function AdminProductCatalogPricesPage() {
           };
           if (r.productVariantId != null && r.productVariantId > 0) {
             body.product_variant_id = r.productVariantId;
+          }
+          if (r.displayName.trim() !== '') {
+            body.display_name = r.displayName.trim();
+          } else {
+            body.display_name = null; // xoá tên nếu để trống
           }
           if (r.id != null && r.id > 0) {
             return adminProductService.updateCatalogPrice(selectedId, r.id, body);
@@ -419,48 +429,67 @@ export default function AdminProductCatalogPricesPage() {
                     </div>
 
                     {/* Fields */}
-                    <div className="grid items-end gap-3 p-4 sm:grid-cols-[160px_1fr_1fr_auto]">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-semibold text-[var(--text-secondary)]">Đơn vị</label>
-                        <UnitSelect
-                          value={row.unitId}
-                          onChange={(v) => updateRow(row.key, { unitId: v })}
-                          className="py-1.5"
-                        />
+                    <div className="space-y-3 p-4">
+                      {/* Hàng 1: Tên hiển thị + Đơn vị */}
+                      <div className="grid items-end gap-3 sm:grid-cols-[1fr_160px]">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                            Tên hiển thị <span className="font-normal text-[var(--text-muted)]">(tuỳ chọn)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={row.displayName}
+                            onChange={(e) => updateRow(row.key, { displayName: e.target.value })}
+                            placeholder="Ví dụ: Hộp 6 chiếc, Combo 2+1…"
+                            className={clsx(inputCls, 'py-1.5')}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold text-[var(--text-secondary)]">Đơn vị</label>
+                          <UnitSelect
+                            value={row.unitId}
+                            onChange={(v) => updateRow(row.key, { unitId: v })}
+                            className="py-1.5"
+                          />
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-semibold text-[var(--text-secondary)]">
-                          Giá bán <span className="font-normal text-[var(--text-muted)]">(VNĐ)</span>
-                        </label>
-                        <VndIntegerInput
-                          value={row.currentValue}
-                          onChange={(n) => updateRow(row.key, { currentValue: n })}
-                          className={clsx(inputCls, 'py-1.5')}
-                        />
+
+                      {/* Hàng 2: Giá bán + Giá gốc + Xóa */}
+                      <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                            Giá bán <span className="font-normal text-[var(--text-muted)]">(VNĐ)</span>
+                          </label>
+                          <VndIntegerInput
+                            value={row.currentValue}
+                            onChange={(n) => updateRow(row.key, { currentValue: n })}
+                            className={clsx(inputCls, 'py-1.5')}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                            Giá gốc <span className="font-normal text-[var(--text-muted)]">(VNĐ · để 0 để ẩn)</span>
+                          </label>
+                          <VndIntegerInput
+                            value={row.referencePrice}
+                            onChange={(n) => updateRow(row.key, { referencePrice: n })}
+                            className={clsx(inputCls, 'py-1.5')}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeRow(row.key)}
+                          disabled={draft.length <= 1}
+                          className={clsx(
+                            'flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--bg-border)]',
+                            'text-[var(--danger)] hover:bg-[var(--bg-elevated)]',
+                            'disabled:cursor-not-allowed disabled:opacity-30'
+                          )}
+                          aria-label="Xóa dòng giá"
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                        </button>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-semibold text-[var(--text-secondary)]">
-                          Giá gốc <span className="font-normal text-[var(--text-muted)]">(VNĐ · để 0 để ẩn)</span>
-                        </label>
-                        <VndIntegerInput
-                          value={row.referencePrice}
-                          onChange={(n) => updateRow(row.key, { referencePrice: n })}
-                          className={clsx(inputCls, 'py-1.5')}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeRow(row.key)}
-                        disabled={draft.length <= 1}
-                        className={clsx(
-                          'flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--bg-border)]',
-                          'text-[var(--danger)] hover:bg-[var(--bg-elevated)]',
-                          'disabled:cursor-not-allowed disabled:opacity-30'
-                        )}
-                        aria-label="Xóa dòng giá"
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                      </button>
                     </div>
                   </div>
                 ))}

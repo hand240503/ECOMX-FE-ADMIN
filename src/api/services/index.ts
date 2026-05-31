@@ -7,3 +7,4 @@ export { orderService } from './orderService';
 export { productService } from './productService';
 export { searchService } from './searchService';
 export { shippingService } from './shippingService';
+export { reportService } from './reportService';

@@ -9,7 +9,6 @@ import { adminPermissionCatalogService } from '../../api/services/adminPermissio
 import { adminUserManagementService } from '../../api/services/adminUserManagementService';
 import {
   adminCustomerService,
-  adminEmployeeService,
   adminStaffService,
 } from '../../api/services/adminStaffEmployeeService';
 import type {
@@ -20,7 +19,7 @@ import type {
   StaffEmployeeModUserInfoRequest,
 } from '../../api/types/adminAccessControl.types';
 import { adminAccessControlUi } from '../../lib/adminAccessControlUi';
-import { isCustomerRoleCode, isEmployeeRoleCode, normalizeRoleCode } from '../../lib/personnelSegment';
+import { isCustomerRoleCode, normalizeRoleCode } from '../../lib/personnelSegment';
 import {
   buildPermissionMatrixRows,
   effectiveSetHasAnyEquivalent,
@@ -43,13 +42,6 @@ const segmentUi: Record<
     docHint: 'Quản lý tài khoản nhân viên nội bộ. Có thể gán chức vụ và đặt lại mật khẩu.',
     createTitle: 'Tạo nhân viên nội bộ',
     editTitle: (id) => `Sửa nhân viên nội bộ #${id}`,
-  },
-  employee: {
-    basePath: '/admin/employees',
-    listLabel: 'Danh sách nhân viên',
-    docHint: 'Quản lý tài khoản nhân viên cửa hàng.',
-    createTitle: 'Tạo nhân viên',
-    editTitle: (id) => `Sửa nhân viên #${id}`,
   },
   customer: {
     basePath: '/admin/customers',
@@ -125,7 +117,6 @@ async function fetchPersonnelDetail(
   signal?: AbortSignal
 ): Promise<AdminUserResponse> {
   if (variant === 'customer') return adminCustomerService.getById(id, signal);
-  if (variant === 'employee') return adminEmployeeService.getById(id, signal);
   return adminStaffService.getById(id, signal);
 }
 
@@ -209,20 +200,11 @@ export default function AdminPersonnelFormPage({ variant }: Props) {
   );
 
   const roleChoices = useMemo(() => {
-    const nonCustomer = editorRoles.filter((r) => !isCustomerRoleCode(r.code));
-    if (variant === 'employee') return nonCustomer.filter((r) => isEmployeeRoleCode(r.code));
-    return nonCustomer;
+    return editorRoles.filter((r) => !isCustomerRoleCode(r.code));
   }, [editorRoles, variant]);
 
   useEffect(() => {
-    if (!isCreate || variant !== 'employee') return;
-    setCreateForm((p) => {
-      if (p.roleId.trim()) return p;
-      const emp = roleChoices.find((r) => isEmployeeRoleCode(r.code));
-      if (!emp) return p;
-      return { ...p, roleId: String(emp.id) };
-    });
-  }, [isCreate, variant, roleChoices]);
+  }, []);
 
   useEffect(() => {
     if (!detailQuery.data) {
@@ -291,9 +273,8 @@ export default function AdminPersonnelFormPage({ variant }: Props) {
         const rid = Number(createForm.roleId.trim());
         if (Number.isFinite(rid)) body.roleId = rid;
       }
-      const created =
-        variant === 'employee' ? await adminEmployeeService.create(body) : await adminStaffService.create(body);
-      notify.success(variant === 'employee' ? 'Đã tạo nhân viên mới' : 'Đã tạo nhân viên nội bộ mới');
+      const created = await adminStaffService.create(body);
+      notify.success('Đã tạo nhân viên mới');
       if (created.temporaryPassword) setTempPasswordModal(created.temporaryPassword);
       await invalidateLists();
       navigate(`${ui.basePath}/${created.id}/edit`, { replace: true });
@@ -331,7 +312,7 @@ export default function AdminPersonnelFormPage({ variant }: Props) {
           if (Number.isFinite(n)) body.managerId = n;
         }
       }
-      const updateFn = variant === 'employee' ? adminEmployeeService.update : adminStaffService.update;
+      const updateFn = adminStaffService.update;
       await updateFn(body);
       notify.success('Đã cập nhật');
       await invalidateLists();
@@ -670,9 +651,7 @@ export default function AdminPersonnelFormPage({ variant }: Props) {
             <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)] sm:col-span-2">
               <span>Chức vụ</span>
               <span className="font-normal text-[10px] text-[var(--text-muted)]">
-                {variant === 'employee'
-                  ? 'Chỉ vai trò Nhân viên được hỗ trợ cho loại tài khoản này.'
-                  : 'Để trống để hệ thống tự gán mặc định.'}
+                {'Để trống để hệ thống tự gán mặc định.'}
               </span>
               <select
                 className={inputCls}

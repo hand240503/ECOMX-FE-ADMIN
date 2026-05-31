@@ -57,6 +57,22 @@ const PERMISSION_GRANT = ['112', 'GRANT_PERMISSION', '700003', 'UPDATE_USER', '1
 const ROLE_WRITE = ['111', 'MANAGE_ROLE', '103', 'UPDATE_ALL', '101', 'CREATE_ALL'] as const;
 const ROLE_DELETE = ['111', 'MANAGE_ROLE', '104', 'DELETE_ALL'] as const;
 
+// ─── Module READ codes ─────────────────────────────────────────────────────────
+// Format: PREFIX*1000+2  (action 2 = read)
+// READ_ALL (102) và elevated roles luôn bypass mọi check.
+const READ_ALL = ['102', 'READ_ALL'] as const;
+
+const PRODUCT_READ   = ['100002', ...READ_ALL] as const; // Sản phẩm
+const PRICE_READ     = ['150002', ...READ_ALL] as const; // Giá
+const UNIT_READ      = ['160002', ...READ_ALL] as const; // Đơn vị tính
+const BRAND_READ     = ['170002', ...READ_ALL] as const; // Thương hiệu
+const CATEGORY_READ  = ['200002', ...READ_ALL] as const; // Danh mục
+const DOCUMENT_READ  = ['300002', ...READ_ALL] as const; // Tài liệu
+const ORDER_READ     = ['500002', ...READ_ALL] as const; // Đơn hàng
+const REPORT_READ    = ['600002', ...READ_ALL] as const; // Báo cáo
+const ROLE_READ_MOD  = ['800002', '111', 'MANAGE_ROLE', ...READ_ALL] as const; // Chức vụ (800)
+const PERM_READ      = ['900002', '112', 'GRANT_PERMISSION', ...READ_ALL] as const; // Phân quyền
+
 function hasElevatedRole(): boolean {
   return authService.hasAnyRole([...ELEVATED_ROLES]);
 }
@@ -83,4 +99,65 @@ export const adminAccessControlUi = {
   lockUser: (): boolean => hasElevatedRole() || authService.hasAnyPermission([...USER_LOCK, ...USER_UPDATE]),
 
   grantOrRevokePermission: (): boolean => hasElevatedRole() || authService.hasAnyPermission([...PERMISSION_GRANT]),
+
+  // ── Quyền XEM theo module (READ prerequisite) ─────────────────────────────
+  // Trả về true nếu user có ít nhất quyền Xem của module đó.
+  // Dùng để ẩn nav item và block route.
+
+  /** Dashboard — luôn hiển thị với mọi user đã đăng nhập */
+  canViewDashboard: (): boolean => true,
+
+  /** Sản phẩm (100xxx) */
+  canViewProducts: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...PRODUCT_READ]),
+
+  /** Danh mục (200xxx) */
+  canViewCategories: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...CATEGORY_READ]),
+
+  /** Hãng / Thương hiệu (170xxx) */
+  canViewBrands: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...BRAND_READ]),
+
+  /** Giá & khuyến mãi (150xxx) — bao gồm các sub-route pricing/* */
+  canViewPricing: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...PRICE_READ]),
+
+  /** Đơn vị tính (160xxx) */
+  canViewUnits: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...UNIT_READ]),
+
+  /** Đơn hàng (500xxx) */
+  canViewOrders: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...ORDER_READ]),
+
+  /** Lịch sử hệ thống — chỉ elevated roles */
+  canViewHistory: (): boolean => hasElevatedRole(),
+
+  /** Nhân sự / User (700xxx / 400xxx legacy) */
+  canViewUsers: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...USER_READ]),
+
+  /** Chức vụ (800xxx) */
+  canViewRoles: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...ROLE_READ_MOD]),
+
+  /** Tài liệu (300xxx) */
+  canViewDocuments: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...DOCUMENT_READ]),
+
+  /** Báo cáo (600xxx) */
+  canViewReports: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...REPORT_READ]),
+
+  /** Phân quyền (900xxx) */
+  canViewPermissions: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...PERM_READ]),
+
+  /** Phòng ban (850xxx) — elevated hoặc có quyền user */
+  canViewDepartments: (): boolean =>
+    hasElevatedRole() || authService.hasAnyPermission([...USER_READ]),
+
+  /** Cài đặt hệ thống — chỉ elevated roles */
+  canViewSettings: (): boolean => hasElevatedRole(),
 };

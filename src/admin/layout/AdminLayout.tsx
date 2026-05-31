@@ -8,13 +8,13 @@ export function AdminLayout() {
 
   return (
     <div
-      className="admin-portal flex min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]"
+      className="admin-portal flex h-screen overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)]"
       data-admin-theme={mode}
     >
       <AdminSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar />
-        <main className="flex-1 overflow-auto bg-[var(--bg-base)] p-6">
+        <main className="flex-1 overflow-y-auto bg-[var(--bg-base)] p-6">
           {/* Căn trái (không mx-auto) để không tạo lề trống lớn giữa sidebar app và nội dung */}
           <div className="w-full max-w-[1600px]">
             <Outlet />

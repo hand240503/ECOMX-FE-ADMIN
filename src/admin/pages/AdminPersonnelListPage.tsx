@@ -5,7 +5,6 @@ import { clsx } from 'clsx';
 import { Pencil, Search } from 'lucide-react';
 import {
   adminCustomerService,
-  adminEmployeeService,
   adminStaffService,
 } from '../../api/services/adminStaffEmployeeService';
 import { adminAccessControlUi } from '../../lib/adminAccessControlUi';
@@ -37,15 +36,6 @@ const copy: Record<
     basePath: '/admin/staff',
     allowCreate: true,
   },
-  employee: {
-    title: 'Nhân viên',
-    headerTitle: 'Nhân viên',
-    createLabel: 'Tạo nhân viên',
-    empty: 'Không có nhân viên trên trang này hoặc sau khi lọc.',
-    apiHint: 'Danh sách nhân viên của cửa hàng.',
-    basePath: '/admin/employees',
-    allowCreate: true,
-  },
   customer: {
     title: 'Khách hàng',
     headerTitle: 'Khách hàng',
@@ -72,7 +62,6 @@ export default function AdminPersonnelListPage({ variant }: Props) {
     queryKey: ['admin-personnel-list', variant, page, PAGE_SIZE],
     queryFn: ({ signal }) => {
       if (variant === 'staff') return adminStaffService.listPaged(page, PAGE_SIZE, signal);
-      if (variant === 'employee') return adminEmployeeService.listPaged(page, PAGE_SIZE, signal);
       return adminCustomerService.listPaged(page, PAGE_SIZE, signal);
     },
     staleTime: 30_000,
@@ -81,11 +70,17 @@ export default function AdminPersonnelListPage({ variant }: Props) {
 
   const showRolesColumn = variant !== 'customer';
 
+  const HIDDEN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN']);
+
   const tableRows = useMemo(() => {
     const items = listQuery.data?.items ?? [];
+    // Ẩn tài khoản ADMIN và SUPER_ADMIN khỏi danh sách nhân sự
+    const visible = variant === 'staff'
+      ? items.filter((u) => !(u.roles ?? []).some((r) => HIDDEN_ROLES.has(r.toUpperCase())))
+      : items;
     const q = filter.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((u) => {
+    if (!q) return visible;
+    return visible.filter((u) => {
       if (String(u.id).includes(q)) return true;
       if ((u.username ?? '').toLowerCase().includes(q)) return true;
       if ((u.email ?? '').toLowerCase().includes(q)) return true;

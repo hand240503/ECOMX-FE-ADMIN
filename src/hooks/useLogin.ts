@@ -86,10 +86,21 @@ export const useLogin = () => {
 
     setLoading(true);
     try {
-      await authService.login({
+      const result = await authService.login({
         login: login.trim(),
         password
       });
+
+      // Tài khoản khách hàng không được truy cập trang quản trị
+      const roles: string[] = result.user_info?.roles ?? [];
+      const isCustomer = roles.some(
+        (r) => r === 'ROLE_CUSTOMER' || r === 'CUSTOMER'
+      );
+      if (isCustomer) {
+        await authService.logout().catch(() => {});
+        setApiError('Tài khoản khách hàng không được dùng bảng quản trị này.');
+        return;
+      }
 
       navigateWithLoading(from, { replace: true, delayMs: 300 });
     } catch (error) {

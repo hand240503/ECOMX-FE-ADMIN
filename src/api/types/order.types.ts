@@ -104,6 +104,8 @@ export type CreatedOrderDetail = {
   /** Phân loại / SKU khi BE trả. */
   productVariantId?: number | null;
   skuCode?: string | null;
+  /** Ảnh đại diện sản phẩm — null trên đơn cũ hoặc sản phẩm chưa có ảnh. */
+  thumbnailUrl?: string | null;
   /** Null / vắng trên đơn cũ — FE chỉ hiển thị khi có. */
   pricingPrograms?: OrderLinePricingPrograms | null;
 };
@@ -175,6 +177,8 @@ export type CreatedOrder = {
   /** @see docs/API_add_order.md — trả hàng/hoàn tiền */
   returnRefundStatus?: number | null;
   returnRefundNote?: string | null;
+  /** Lý do hủy đơn — có khi status = 5. */
+  cancelNote?: string | null;
   createdDate?: string;
   modifiedDate?: string;
   /** Cập nhật sau IPN VNPAY (nếu backend trả). */

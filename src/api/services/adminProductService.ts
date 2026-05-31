@@ -141,6 +141,17 @@ function normalizePriceChange(
   const en = o.enabled;
   const enabled = !(en === false || en === 0 || en === 'false');
 
+  const qlRaw = o.quantityLimit ?? o.quantity_limit;
+  const quantityLimit = qlRaw == null || qlRaw === '' ? null : Number(qlRaw);
+  const sqRaw = o.soldQuantity ?? o.sold_quantity;
+  const soldQuantity = sqRaw == null || sqRaw === '' ? null : Number(sqRaw);
+  const rqRaw = o.remainingQuantity ?? o.remaining_quantity;
+  const remainingQuantity = rqRaw == null || rqRaw === '' ? null : Number(rqRaw);
+  const mpcRaw = o.maxPerCustomer ?? o.max_per_customer;
+  const maxPerCustomer = mpcRaw == null || mpcRaw === '' ? null : Number(mpcRaw);
+  const pmRaw = o.requiredPaymentMethodCode ?? o.required_payment_method_code;
+  const requiredPaymentMethodCode = typeof pmRaw === 'string' && pmRaw.trim() !== '' ? pmRaw.trim() : null;
+
   return {
     id: Number.isFinite(id) ? id : 0,
     productId,
@@ -150,6 +161,11 @@ function normalizePriceChange(
     startAt,
     endAt,
     enabled,
+    quantityLimit: quantityLimit != null && Number.isFinite(quantityLimit) ? quantityLimit : null,
+    soldQuantity: soldQuantity != null && Number.isFinite(soldQuantity) ? soldQuantity : null,
+    remainingQuantity: remainingQuantity != null && Number.isFinite(remainingQuantity) ? remainingQuantity : null,
+    maxPerCustomer: maxPerCustomer != null && Number.isFinite(maxPerCustomer) ? maxPerCustomer : null,
+    requiredPaymentMethodCode,
   };
 }
 

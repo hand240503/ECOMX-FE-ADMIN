@@ -116,7 +116,14 @@ export function AdminSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4">
-        {adminNavSections.map((section) => (
+        {adminNavSections.map((section) => {
+          // Lọc item user có quyền xem
+          const visibleItems = section.items.filter(
+            (item) => !item.visibilityCheck || item.visibilityCheck(),
+          );
+          // Ẩn cả section nếu không còn item nào visible
+          if (visibleItems.length === 0) return null;
+          return (
           <div key={section.id} className="mb-6">
             {!collapsed && (
               <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -124,7 +131,7 @@ export function AdminSidebar() {
               </p>
             )}
             <ul className="space-y-1">
-              {section.items.map((item) => {
+              {visibleItems.map((item) => {
                 const hasChildren = Boolean(item.children?.length);
                 const subExpanded = hasChildren && !collapsed && isNavGroupExpanded(item.to);
                 const rowActive = sidebarItemRowActive(pathname, item);
@@ -233,7 +240,8 @@ export function AdminSidebar() {
               })}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="border-t border-[var(--bg-border)] p-2">

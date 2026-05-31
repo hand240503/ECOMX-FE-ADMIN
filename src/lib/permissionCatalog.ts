@@ -69,6 +69,7 @@ export const PERMISSION_MODULE_PREFIX_VI: Record<number, string> = {
   600: 'Báo cáo',
   700: 'Quản lý user',
   800: 'Chức vụ',
+  850: 'Phòng ban',
   900: 'Phân quyền',
 };
 
@@ -122,6 +123,27 @@ export function equivalentCrudPermissionCodes(code: number): number[] {
     out.add(code);
   }
   return [...out].sort((a, b) => a - b);
+}
+
+/**
+ * Trả về mã quyền READ (action = 2) của cùng module.
+ * Ví dụ: 100001 (create sản phẩm) → 100002 (read sản phẩm).
+ * Trả về null nếu không xác định được module.
+ */
+export function readCodeForModule(code: number): number | null {
+  const prefix = modulePrefixFromPermissionCode(code);
+  if (prefix == null) return null;
+  return prefix * 1000 + 2;
+}
+
+/**
+ * Trả về các mã quyền CUD (Create / Update / Delete, action 1/3/4) của cùng module.
+ * Ví dụ: 100002 (read sản phẩm) → [100001, 100003, 100004].
+ */
+export function cudCodesForModule(code: number): number[] {
+  const prefix = modulePrefixFromPermissionCode(code);
+  if (prefix == null) return [];
+  return [prefix * 1000 + 1, prefix * 1000 + 3, prefix * 1000 + 4];
 }
 
 export function effectiveSetHasAnyEquivalent(effective: ReadonlySet<number>, code: number): boolean {

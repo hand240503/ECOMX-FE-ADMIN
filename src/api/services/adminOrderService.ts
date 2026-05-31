@@ -58,11 +58,11 @@ export const adminOrderService = {
    * Yêu cầu quyền UPDATE_ORDER (500003).
    * Luồng hợp lệ: 1→2/5, 2→3/5, 3→4/5. Trạng thái 4 và 5 là terminal.
    */
-  async updateOrderStatus(id: number, status: number): Promise<OrderDto> {
+  async updateOrderStatus(id: number, status: number, cancelNote?: string): Promise<OrderDto> {
     try {
       const { data } = await axiosInstance.patch<ApiResponse<OrderDto>>(
         API_ENDPOINTS.ADMIN.ORDER_UPDATE_STATUS(id),
-        { status }
+        { status, cancelNote: cancelNote ?? null }
       );
       if (!data.success || data.data === undefined) {
         throw new Error(data.message || 'Không cập nhật được trạng thái đơn hàng');
@@ -70,6 +70,26 @@ export const adminOrderService = {
       return data.data;
     } catch (error) {
       throw new Error(parseApiErrorMessage(error, 'Không cập nhật được trạng thái đơn hàng'));
+    }
+  },
+
+  /**
+   * PATCH /admin/orders/{id}/return-status
+   * Yêu cầu quyền UPDATE_ORDER (500003).
+   * Luồng: 1(Requested)→2(Accepted)/5(Rejected), 2→3(Refunding)/5, 3→4(Refunded)/5.
+   */
+  async updateReturnStatus(id: number, returnStatus: number, note?: string): Promise<OrderDto> {
+    try {
+      const { data } = await axiosInstance.patch<ApiResponse<OrderDto>>(
+        API_ENDPOINTS.ADMIN.ORDER_UPDATE_RETURN_STATUS(id),
+        { returnStatus, note: note ?? null }
+      );
+      if (!data.success || data.data === undefined) {
+        throw new Error(data.message || 'Không cập nhật được trạng thái trả hàng');
+      }
+      return data.data;
+    } catch (error) {
+      throw new Error(parseApiErrorMessage(error, 'Không cập nhật được trạng thái trả hàng'));
     }
   },
 };

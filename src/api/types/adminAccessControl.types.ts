@@ -143,10 +143,9 @@ export interface StaffEmployeeModUserInfoRequest {
 /**
  * @see docs/ADMIN_STAFF_CUSTOMERS_API_FE.md
  * - `staff`: GET/POST/PUT/DELETE /admin/staff (không CUSTOMER)
- * - `employee`: chỉ EMPLOYEE — /admin/employees
  * - `customer`: CUSTOMER — /admin/customers (đọc)
  */
-export type AdminPersonnelSegment = 'staff' | 'employee' | 'customer';
+export type AdminPersonnelSegment = 'staff' | 'customer';
 
 export interface UserPermissionsResponse {
   userId: number;

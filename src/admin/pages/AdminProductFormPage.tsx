@@ -87,6 +87,8 @@ type CatalogPriceRow = {
   unitId: string;
   currentValue: string;
   referencePrice: string;
+  /** Tên hiển thị tuỳ chỉnh cho mức giá (ví dụ: "Hộp 6 chiếc"). Rống = không có. */
+  displayName: string;
 };
 
 type VariantFormValues = {
@@ -456,7 +458,7 @@ function mergeVariantSkuGalleryIntoUpdatedVariants(
 
 /** `unitId` rỗng → UnitSelect chỉnh theo đơn vị đầu trong GET `/admin/units` (đừng cứng `1` — id phụ thuộc tenant). */
 function emptyCatalogPriceRow(defaultUnitId = ''): CatalogPriceRow {
-  return { unitId: defaultUnitId, currentValue: '0', referencePrice: '0' };
+  return { unitId: defaultUnitId, currentValue: '0', referencePrice: '0', displayName: '' };
 }
 
 function emptyVariantFormRow(sortIndex: number, defaultUnitId = ''): VariantFormValues {
@@ -488,6 +490,8 @@ function coerceProductPrice(raw: unknown): ProductPrice | null {
     const pvn = Number(pvRaw);
     if (Number.isFinite(pvn) && pvn > 0) productVariantId = pvn;
   }
+  const dnRaw = r.displayName ?? r.display_name;
+  const displayName = typeof dnRaw === 'string' && dnRaw.trim() !== '' ? dnRaw.trim() : null;
   return {
     id,
     currentValue: Number.isFinite(currentValue) ? currentValue : 0,
@@ -497,6 +501,7 @@ function coerceProductPrice(raw: unknown): ProductPrice | null {
     unitName,
     unitRatio,
     ...(productVariantId != null ? { productVariantId } : {}),
+    ...(displayName != null ? { displayName } : {}),
   };
 }
 
@@ -741,6 +746,7 @@ function variantSnapsToFormValues(
           unitId: String(row.unitId),
           currentValue: String(row.currentValue),
           referencePrice: String(row.oldValue ?? 0),
+          displayName: row.displayName ?? '',
         }))
         : [emptyCatalogPriceRow(fallbackCatalogUnitId)];
     return {
@@ -805,8 +811,13 @@ function buildCatalogPriceUpdatePayload(
     if (!Number.isFinite(current_value) || current_value < 0) continue;
 
     const origOld = orig.oldValue ?? 0;
+    // Tính displayName dirty trước để hợp nhất vào changed check
+    const dn = (row.displayName ?? '').trim();
+    const origDn = (orig.displayName ?? '').trim();
+    const displayNameDirty = dn !== origDn;
+
     const changed =
-      unitId !== orig.unitId || current_value !== orig.currentValue || oldVal !== origOld;
+      unitId !== orig.unitId || current_value !== orig.currentValue || oldVal !== origOld || displayNameDirty;
 
     if (!changed) continue;
 
@@ -817,6 +828,10 @@ function buildCatalogPriceUpdatePayload(
     // BE giữ giá trị cũ (theo spec "Không gửi → giữ old_value trên DB").
     if (oldVal !== origOld) {
       if (Number.isFinite(oldVal) && oldVal > 0) item.old_value = oldVal;
+    }
+    // Gửi display_name khi thay đổi: chuỗi có nội dung → lưu, rỗng → null (xóa).
+    if (displayNameDirty) {
+      item.display_name = dn !== '' ? dn : null;
     }
     updatedPrices.push(item);
   }
@@ -835,6 +850,8 @@ function buildCatalogPriceUpdatePayload(
 
     const np: CreatePriceRequest = { unit_id, current_value };
     if (refRaw !== '' && Number.isFinite(oldNum) && oldNum > 0) np.old_value = oldNum;
+    const dn = (row.displayName ?? '').trim();
+    if (dn !== '') np.display_name = dn;
     newPrices.push(np);
   }
 
@@ -859,6 +876,8 @@ function rowsToCreatePriceRequests(
     if (!Number.isFinite(current_value) || current_value < 0) continue;
     const np: CreatePriceRequest = { unit_id, current_value };
     if (refRaw !== '' && Number.isFinite(oldNum) && oldNum > 0) np.old_value = oldNum;
+    const dn = (row.displayName ?? '').trim();
+    if (dn !== '') np.display_name = dn;
     const id = Number(productId);
     if (Number.isFinite(id) && id > 0) np.product_id = Math.trunc(id);
     out.push(np);
@@ -1596,72 +1615,90 @@ function VariantSkuCard({
             return (
               <Fragment key={pf.id}>
                 <input type="hidden" {...register(`variants.${index}.prices.${pidx}.priceId`)} />
-                <div className="grid items-start gap-2 rounded-lg border border-[var(--bg-border)] bg-[var(--bg-elevated)]/30 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-                  {/* Đơn vị */}
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor={unitSelId} className={priceRowLabelCls}>Đơn vị</label>
-                    <Controller
-                      name={`variants.${index}.prices.${pidx}.unitId`}
-                      control={control}
-                      render={({ field: ctrlField }) => (
-                        <UnitSelect
-                          id={unitSelId}
-                          value={ctrlField.value}
-                          onChange={(v) => ctrlField.onChange(String(v))}
-                          className="!h-10 !py-0 leading-snug"
-                        />
-                      )}
-                    />
-                  </div>
-                  {/* Giá bán */}
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor={curId} className={priceRowLabelCls}>Giá bán (VNĐ)</label>
-                    <input
-                      id={curId}
-                      {...register(`variants.${index}.prices.${pidx}.currentValue`)}
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      autoComplete="off"
-                      aria-invalid={curPriceErrMsg ? true : undefined}
-                      aria-describedby={curPriceErrMsg ? `${curId}-err` : undefined}
-                      className={clsx(priceRowControlCls, curPriceErrMsg ? invalidOutlineCls : null)}
-                    />
-                    {curPriceErrMsg ? (
-                      <span id={`${curId}-err`} role="alert" className="text-[11px] text-[var(--danger)]">{String(curPriceErrMsg)}</span>
-                    ) : null}
-                  </div>
-                  {/* Giá tham chiếu */}
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor={refId} className={priceRowLabelCls}>Giá gốc (VNĐ)</label>
-                    <input
-                      id={refId}
-                      {...register(`variants.${index}.prices.${pidx}.referencePrice`)}
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      autoComplete="off"
-                      aria-invalid={refPriceErrMsg ? true : undefined}
-                      aria-describedby={refPriceErrMsg ? `${refId}-err` : undefined}
-                      className={clsx(priceRowControlCls, refPriceErrMsg ? invalidOutlineCls : null)}
-                    />
-                    {refPriceErrMsg ? (
-                      <span id={`${refId}-err`} role="alert" className="text-[11px] text-[var(--danger)]">{String(refPriceErrMsg)}</span>
-                    ) : null}
-                  </div>
-                  {/* Xóa dòng */}
-                  {priceFields.fields.length > 1 ? (
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        onClick={() => priceFields.remove(pidx)}
-                        className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--bg-border)] text-[var(--danger)] hover:bg-[var(--bg-elevated)]"
-                        aria-label="Xóa mức giá"
-                      >
-                        <X className="size-3.5" />
-                      </button>
+                <div className="space-y-2 rounded-lg border border-[var(--bg-border)] bg-[var(--bg-elevated)]/30 p-3">
+                  {/* Hàng 1: Tên hiển thị + Đơn vị */}
+                  <div className="grid items-end gap-2 sm:grid-cols-[1fr_160px]">
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor={`${fieldIdPrefix}-p${pidx}-dn`} className={priceRowLabelCls}>
+                        Tên hiển thị <span className="font-normal text-[var(--text-muted)]">(tuỳ chọn)</span>
+                      </label>
+                      <input
+                        id={`${fieldIdPrefix}-p${pidx}-dn`}
+                        {...register(`variants.${index}.prices.${pidx}.displayName`)}
+                        type="text"
+                        autoComplete="off"
+                        placeholder="Ví dụ: Hộp 6 chiếc, Combo 2+1…"
+                        className={priceRowControlCls}
+                      />
                     </div>
-                  ) : null}
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor={unitSelId} className={priceRowLabelCls}>Đơn vị</label>
+                      <Controller
+                        name={`variants.${index}.prices.${pidx}.unitId`}
+                        control={control}
+                        render={({ field: ctrlField }) => (
+                          <UnitSelect
+                            id={unitSelId}
+                            value={ctrlField.value}
+                            onChange={(v) => ctrlField.onChange(String(v))}
+                            className="!h-10 !py-0 leading-snug"
+                          />
+                        )}
+                      />
+                    </div>
+                  </div>
+                  {/* Hàng 2: Giá bán + Giá gốc + Xóa */}
+                  <div className="grid items-start gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                    {/* Giá bán */}
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor={curId} className={priceRowLabelCls}>Giá bán (VNĐ)</label>
+                      <input
+                        id={curId}
+                        {...register(`variants.${index}.prices.${pidx}.currentValue`)}
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        autoComplete="off"
+                        aria-invalid={curPriceErrMsg ? true : undefined}
+                        aria-describedby={curPriceErrMsg ? `${curId}-err` : undefined}
+                        className={clsx(priceRowControlCls, curPriceErrMsg ? invalidOutlineCls : null)}
+                      />
+                      {curPriceErrMsg ? (
+                        <span id={`${curId}-err`} role="alert" className="text-[11px] text-[var(--danger)]">{String(curPriceErrMsg)}</span>
+                      ) : null}
+                    </div>
+                    {/* Giá tham chiếu */}
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor={refId} className={priceRowLabelCls}>Giá gốc (VNĐ)</label>
+                      <input
+                        id={refId}
+                        {...register(`variants.${index}.prices.${pidx}.referencePrice`)}
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        autoComplete="off"
+                        aria-invalid={refPriceErrMsg ? true : undefined}
+                        aria-describedby={refPriceErrMsg ? `${refId}-err` : undefined}
+                        className={clsx(priceRowControlCls, refPriceErrMsg ? invalidOutlineCls : null)}
+                      />
+                      {refPriceErrMsg ? (
+                        <span id={`${refId}-err`} role="alert" className="text-[11px] text-[var(--danger)]">{String(refPriceErrMsg)}</span>
+                      ) : null}
+                    </div>
+                    {/* Xóa dòng */}
+                    {priceFields.fields.length > 1 ? (
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => priceFields.remove(pidx)}
+                          className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--bg-border)] text-[var(--danger)] hover:bg-[var(--bg-elevated)]"
+                          aria-label="Xóa mức giá"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </Fragment>
             );
@@ -1864,6 +1901,7 @@ export default function AdminProductFormPage() {
                   unitId: String(row.unitId),
                   currentValue: String(row.currentValue),
                   referencePrice: String(row.oldValue ?? 0),
+                  displayName: row.displayName ?? '',
                 }))
                 : [emptyCatalogPriceRow(defaultCatalogUnitStr)],
           },

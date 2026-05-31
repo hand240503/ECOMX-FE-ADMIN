@@ -5,27 +5,30 @@ import type { CatalogEntry, CrudColumnKey, PermissionMatrixRow } from '../../../
 import {
   CRUD_COLUMN_LABEL,
   CRUD_COLUMN_ORDER,
+  cudCodesForModule,
   effectiveSetHasAnyEquivalent,
   equivalentCrudPermissionCodes,
+  modulePrefixFromPermissionCode,
+  readCodeForModule,
 } from '../../../lib/permissionCatalog';
 import { notify } from '../../../utils/notify';
 
 // ─── Colour tokens ────────────────────────────────────────────────────────────
 
 /** Trực tiếp cấp cho user */
-const DIRECT_BG   = '#dcfce7';
+const DIRECT_BG = '#dcfce7';
 const DIRECT_RING = '#22c55e';
-const DIRECT_FG   = '#15803d';
+const DIRECT_FG = '#15803d';
 
 /** Kế thừa từ chức vụ */
-const ROLE_BG   = '#e0f2fe';
+const ROLE_BG = '#e0f2fe';
 const ROLE_RING = '#38bdf8';
-const ROLE_FG   = '#0369a1';
+const ROLE_FG = '#0369a1';
 
 /** Hệ thống cấp (không gán qua UI) */
-const SYS_BG   = '#fef9c3';
+const SYS_BG = '#fef9c3';
 const SYS_RING = '#fbbf24';
-const SYS_FG   = '#92400e';
+const SYS_FG = '#92400e';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -109,7 +112,16 @@ function MatrixLegend() {
 
 // ─── Permission Toggle Cell ───────────────────────────────────────────────────
 
-function CircularPermissionToggle({ entry, ctx }: { entry: CatalogEntry; ctx: ToggleCtx }) {
+function CircularPermissionToggle({
+  entry,
+  ctx,
+  column,
+}: {
+  entry: CatalogEntry;
+  ctx: ToggleCtx;
+  /** Cột CRUD hiện tại — dùng để áp rule READ prerequisite */
+  column?: CrudColumnKey;
+}) {
   const {
     effectiveSet,
     rolePermissionSet,
@@ -132,26 +144,54 @@ function CircularPermissionToggle({ entry, ctx }: { entry: CatalogEntry; ctx: To
     !isDirect &&
     equivalents.some((c) => rolePermissionSet.has(c));
   const canToggle = canMutate && assignable && !busy;
-  const readOnlyEffective = !assignable && effective; // system-level
+  const readOnlyEffective = !assignable && effective;
 
   const title = `${code}: ${entry.label}`;
 
   const runToggle = useCallback(async () => {
     if (!canToggle) return;
+
     if (!effective) {
+      // ── GRANT ──────────────────────────────────────────────────────────────
+      // Rule: Tạo / Cập nhật / Xóa yêu cầu có quyền Xem trước.
+      if (column && column !== 'read') {
+        const readCode = readCodeForModule(code);
+        if (readCode != null && !effectiveSetHasAnyEquivalent(effectiveSet, readCode)) {
+          // Tự động cấp READ cùng lúc
+          await onGrantCodes([readCode, code]);
+          notify.info('Đã tự động cấp quyền Xem vì đây là điều kiện bắt buộc.');
+          return;
+        }
+      }
       await onGrantCodes([code]);
       return;
     }
+
     if (isDirect) {
+      // ── REVOKE ─────────────────────────────────────────────────────────────
+      // Rule: Khi thu hồi Xem → cũng thu hồi Tạo / Cập nhật / Xóa của module đó.
+      if (column === 'read') {
+        const cudDirect = cudCodesForModule(code).filter((c) => userPermissionSet.has(c));
+        const toRevoke = [...new Set([...directHits, ...cudDirect])];
+        await onRevokeCodes(toRevoke);
+        if (cudDirect.length > 0) {
+          notify.info('Đã thu hồi kèm các quyền Tạo / Cập nhật / Xóa phụ thuộc vào Xem.');
+        }
+        return;
+      }
       await onRevokeCodes(directHits.length ? directHits : [code]);
       return;
     }
+
     if (isFromRole) {
       notify.info('Quyền này đang đến từ chức vụ — chỉnh chức vụ của tài khoản để bỏ quyền này.');
     }
-  }, [canToggle, code, directHits, effective, isDirect, isFromRole, onGrantCodes, onRevokeCodes]);
+  }, [
+    canToggle, code, column, directHits, effective, effectiveSet,
+    isDirect, isFromRole, onGrantCodes, onRevokeCodes, userPermissionSet,
+  ]);
 
-  // ── System-level (not assignable via UI) ──
+  // ── System-level ──
   if (readOnlyEffective) {
     return (
       <div className="flex flex-col items-center" title={`${title} (cấp bởi hệ thống)`}>
@@ -168,9 +208,9 @@ function CircularPermissionToggle({ entry, ctx }: { entry: CatalogEntry; ctx: To
 
   // ── Has permission ──
   if (effective) {
-    const bg    = isDirect ? DIRECT_BG   : ROLE_BG;
-    const ring  = isDirect ? DIRECT_RING : ROLE_RING;
-    const fg    = isDirect ? DIRECT_FG   : ROLE_FG;
+    const bg = isDirect ? DIRECT_BG : ROLE_BG;
+    const ring = isDirect ? DIRECT_RING : ROLE_RING;
+    const fg = isDirect ? DIRECT_FG : ROLE_FG;
     const label = isDirect ? `${title} — cấp trực tiếp` : `${title} — từ chức vụ`;
 
     return (
@@ -226,7 +266,17 @@ function CircularPermissionToggle({ entry, ctx }: { entry: CatalogEntry; ctx: To
 
 // ─── Cell: all entries for one (module × CRUD) ───────────────────────────────
 
-function CellCircles({ entries, ctx, idPrefix }: { entries: CatalogEntry[]; ctx: ToggleCtx; idPrefix: string }) {
+function CellCircles({
+  entries,
+  ctx,
+  idPrefix,
+  column,
+}: {
+  entries: CatalogEntry[];
+  ctx: ToggleCtx;
+  idPrefix: string;
+  column: CrudColumnKey;
+}) {
   if (entries.length === 0) {
     return (
       <div className="flex min-h-[52px] items-center justify-center px-2 py-2">
@@ -243,7 +293,12 @@ function CellCircles({ entries, ctx, idPrefix }: { entries: CatalogEntry[]; ctx:
   return (
     <div className="flex flex-col items-center gap-2.5 py-2">
       {sorted.map((entry) => (
-        <CircularPermissionToggle key={`${idPrefix}-${entry.code}`} entry={entry} ctx={ctx} />
+        <CircularPermissionToggle
+          key={`${idPrefix}-${entry.code}`}
+          entry={entry}
+          ctx={ctx}
+          column={column}
+        />
       ))}
     </div>
   );
@@ -269,9 +324,9 @@ function entryListOther(entries: CatalogEntry[], ctx: ToggleCtx): ReactNode {
 
 const CRUD_ACCENT: Record<string, { active: string; rest: string }> = {
   create: { active: 'border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400', rest: '' },
-  read:   { active: 'border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-950/40 dark:text-sky-400',         rest: '' },
+  read: { active: 'border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-950/40 dark:text-sky-400', rest: '' },
   update: { active: 'border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-400', rest: '' },
-  delete: { active: 'border-rose-400 bg-rose-50 text-rose-700 dark:border-rose-600 dark:bg-rose-950/40 dark:text-rose-400',   rest: '' },
+  delete: { active: 'border-rose-400 bg-rose-50 text-rose-700 dark:border-rose-600 dark:bg-rose-950/40 dark:text-rose-400', rest: '' },
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -310,6 +365,7 @@ export function PermissionCrudMatrixEditor({
     onRevokeCodes,
   };
 
+  // ── Column bulk toggle ────────────────────────────────────────────────────
   const runColumnBulk = useCallback(
     async (col: CrudColumnKey) => {
       if (!canMutate || busy) return;
@@ -319,24 +375,52 @@ export function PermissionCrudMatrixEditor({
         return;
       }
       const allOn = codes.every((c) => effectiveSetHasAnyEquivalent(effectiveSet, c));
+
       if (allOn) {
-        const toRevoke = [
+        // ── Revoke all in column ──
+        let toRevoke = [
           ...new Set(
             codes.flatMap((c) =>
               equivalentCrudPermissionCodes(c).filter((x) => userPermissionSet.has(x))
             )
           ),
         ];
+        // Rule: Thu hồi Xem → cũng thu hồi CUD
+        if (col === 'read') {
+          const cudDirect = codes
+            .flatMap((c) => cudCodesForModule(c))
+            .filter((c) => userPermissionSet.has(c));
+          toRevoke = [...new Set([...toRevoke, ...cudDirect])];
+          if (cudDirect.length > 0) {
+            notify.info('Đã thu hồi kèm các quyền Tạo / Cập nhật / Xóa phụ thuộc vào Xem.');
+          }
+        }
         if (toRevoke.length > 0) await onRevokeCodes(toRevoke);
         else notify.info('Các quyền trong cột đang đến từ chức vụ — chỉnh chức vụ để bỏ.');
       } else {
+        // ── Grant missing in column ──
         const toGrant = codes.filter((c) => !effectiveSetHasAnyEquivalent(effectiveSet, c));
-        if (toGrant.length > 0) await onGrantCodes(toGrant);
+        let allToGrant = [...toGrant];
+
+        // Rule: Cấp CUD → tự động bao gồm Xem nếu chưa có
+        if (col !== 'read') {
+          const readCodes = collectAssignableCodesInColumn(rows, 'read', isCodeAssignable);
+          const missingRead = readCodes.filter(
+            (rc) => !effectiveSetHasAnyEquivalent(effectiveSet, rc)
+          );
+          if (missingRead.length > 0) {
+            allToGrant = [...new Set([...missingRead, ...allToGrant])];
+            notify.info('Đã tự động cấp quyền Xem vì đây là điều kiện bắt buộc.');
+          }
+        }
+
+        if (allToGrant.length > 0) await onGrantCodes(allToGrant);
       }
     },
     [busy, canMutate, effectiveSet, isCodeAssignable, onGrantCodes, onRevokeCodes, rows, userPermissionSet]
   );
 
+  // ── Row bulk toggle ───────────────────────────────────────────────────────
   const runRowBulk = useCallback(
     async (row: PermissionMatrixRow) => {
       if (!canMutate || busy) return;
@@ -347,6 +431,8 @@ export function PermissionCrudMatrixEditor({
       }
       const allOn = codes.every((c) => effectiveSetHasAnyEquivalent(effectiveSet, c));
       if (allOn) {
+        // Revoke all in row — READ thu hồi kéo theo CUD, nhưng nếu grant all thì đều có,
+        // nên revoke tất cả codes là đủ (không cần cascade thêm)
         const toRevoke = [
           ...new Set(
             codes.flatMap((c) =>
@@ -357,6 +443,7 @@ export function PermissionCrudMatrixEditor({
         if (toRevoke.length > 0) await onRevokeCodes(toRevoke);
         else notify.info('Các quyền trong phân hệ đang đến từ chức vụ — chỉnh chức vụ để bỏ.');
       } else {
+        // Grant missing in row — READ luôn được bao gồm trong toGrant nếu chưa có
         const toGrant = codes.filter((c) => !effectiveSetHasAnyEquivalent(effectiveSet, c));
         if (toGrant.length > 0) await onGrantCodes(toGrant);
       }
@@ -395,7 +482,11 @@ export function PermissionCrudMatrixEditor({
                   type="button"
                   disabled={bulkDisabled}
                   onClick={() => void runColumnBulk(key)}
-                  title={allOn ? `Bỏ tất cả quyền ${CRUD_COLUMN_LABEL[key]}` : `Gán tất cả quyền ${CRUD_COLUMN_LABEL[key]}`}
+                  title={
+                    allOn
+                      ? `Bỏ tất cả quyền ${CRUD_COLUMN_LABEL[key]}`
+                      : `Gán tất cả quyền ${CRUD_COLUMN_LABEL[key]}`
+                  }
                   className={clsx(
                     'rounded-full border px-5 py-2 text-center text-[12px] font-semibold transition-all duration-200',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1',
@@ -433,7 +524,11 @@ export function PermissionCrudMatrixEditor({
                     type="button"
                     disabled={bulkDisabled}
                     onClick={() => void runRowBulk(row)}
-                    title={rowAllOn ? `Bỏ tất cả quyền: ${row.moduleLabel}` : `Gán tất cả quyền: ${row.moduleLabel}`}
+                    title={
+                      rowAllOn
+                        ? `Bỏ tất cả quyền: ${row.moduleLabel}`
+                        : `Gán tất cả quyền: ${row.moduleLabel}`
+                    }
                     className={clsx(
                       'group flex items-center gap-2 text-left text-sm font-medium transition-colors',
                       !bulkDisabled && 'cursor-pointer hover:text-[var(--accent)]',
@@ -444,7 +539,9 @@ export function PermissionCrudMatrixEditor({
                     <span
                       className={clsx(
                         'h-4 w-0.5 shrink-0 rounded-full transition-colors',
-                        rowAllOn ? 'bg-[var(--accent)]' : 'bg-[var(--bg-border)] group-hover:bg-[var(--accent)]/50'
+                        rowAllOn
+                          ? 'bg-[var(--accent)]'
+                          : 'bg-[var(--bg-border)] group-hover:bg-[var(--accent)]/50'
                       )}
                       aria-hidden
                     />
@@ -464,6 +561,7 @@ export function PermissionCrudMatrixEditor({
                       entries={row.columns[key as CrudColumnKey]}
                       ctx={ctx}
                       idPrefix={`m-${row.moduleKey}-${key}`}
+                      column={key as CrudColumnKey}
                     />
                   </div>
                 ))}

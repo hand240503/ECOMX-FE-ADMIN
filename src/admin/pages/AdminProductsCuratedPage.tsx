@@ -30,7 +30,7 @@ const COPY: Record<AdminProductsCuratedKind, { title: string; querySuffix: strin
 
   'hot-sale': {
 
-    title: 'Hot-sale',
+    title: 'Bán chạy',
 
     querySuffix: 'hot-sale',
 
@@ -76,27 +76,21 @@ export default function AdminProductsCuratedPage({ kind }: { kind: AdminProducts
 
 
 
-  const canPrev = page > 0;
-
-  const canNext = page + 1 < totalPages;
-
-
-
   const pagination =
 
     totalElements > 0
 
       ? {
 
-          canPrev,
+          currentPage: page,
 
-          canNext,
+          totalPages,
 
-          summary: `Trang ${page + 1}/${totalPages} · ${slice.length} kết quả · tổng ${totalElements}`,
+          totalElements,
 
-          onPrev: () => setPage((p) => Math.max(0, p - 1)),
+          pageSize: limit,
 
-          onNext: () => setPage((p) => (p + 1 < totalPages ? p + 1 : p)),
+          onPageChange: (p: number) => setPage(p),
 
         }
 

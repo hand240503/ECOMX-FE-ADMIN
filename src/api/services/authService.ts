@@ -290,6 +290,8 @@ export const authService = {
     const profilePayload = compactObject({
       fullName: input.fullName,
       telephone: input.telephone ?? input.phoneNumber,
+      email: input.email,
+      phoneNumber: input.phoneNumber,
       avatar: input.avatar,
       managerId: input.managerId,
       info01: input.info01,
@@ -321,9 +323,19 @@ export const authService = {
     }
 
     const updatedPayload = response.data.data;
-    const updatedUser = 'user_info' in updatedPayload ? updatedPayload.user_info : updatedPayload;
-    tokenStorage.setUser(updatedUser);
-    return updatedUser;
+    const user = 'user_info' in response.data.data ? response.data.data.user_info : response.data.data;
+    tokenStorage.setUser(user);
+    return user;
+  },
+
+  changePassword: async (input: ChangePasswordRequest): Promise<void> => {
+    const response = await axiosInstance.post<ApiResponse<void>>(
+      API_ENDPOINTS.USER.CHANGE_PASSWORD,
+      input
+    );
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Thay đổi mật khẩu thất bại');
+    }
   },
 
   getCurrentUser: (): AuthResponse['user_info'] | null => {

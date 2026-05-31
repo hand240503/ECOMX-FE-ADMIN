@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { Copy, Pause, Pencil, Play, Tag, Trash2 } from 'lucide-react';
+import { Copy, CreditCard, Pause, Pencil, Play, Tag, Trash2 } from 'lucide-react';
 import { adminProductService } from '../../api/services/adminProductService';
+import { orderService } from '../../api/services/orderService';
 import type { ProductPriceChange, ProductPriceChangeUpsert, ProductFullResponse } from '../../api/types/product.types';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
@@ -42,6 +43,12 @@ type FormState = {
   startAt: string;
   endAtInput: string;
   enabled: boolean;
+  /** Tổng quota được bán theo giá PC. '' = không giới hạn. @Min(1) nếu đặt. */
+  quantityLimitInput: string;
+  /** Mỗi khách mua tối đa bao nhiêu đơn vị. '' = không giới hạn. @Min(1) nếu đặt. */
+  maxPerCustomerInput: string;
+  /** Mã PTTT bắt buộc (VNPAY, …). '' = mọi phương thức. */
+  requiredPaymentMethodCode: string;
 };
 
 function emptyForm(productId: number | null, variantId: number | null): FormState {
@@ -53,6 +60,9 @@ function emptyForm(productId: number | null, variantId: number | null): FormStat
     startAt: new Date().toISOString(),
     endAtInput: '',
     enabled: true,
+    quantityLimitInput: '',
+    maxPerCustomerInput: '',
+    requiredPaymentMethodCode: '',
   };
 }
 
@@ -75,18 +85,21 @@ function statusBadge(status: ProgramStatus) {
     case 'upcoming':
       return <StatusBadge tone="info" label="Sắp diễn ra" />;
     case 'disabled':
-      return <StatusBadge tone="neutral" label="Đã tắt" />;
+      return <StatusBadge tone="danger" label="Đã dừng" />;
     case 'expired':
       return <StatusBadge tone="neutral" label="Đã kết thúc" />;
   }
 }
 
-function formatDateShort(iso: string | null): string {
+
+function formatDateTime(iso: string | null): string {
   if (!iso) return '∞';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  return d.toLocaleString('vi-VN', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
 }
 
 /** Đã tới `startAt` → đợt đã/đang chạy theo lịch: chỉ được dừng (tắt), không xóa. */
@@ -177,6 +190,12 @@ export default function AdminPriceChangesPage() {
     queryKey: ['admin-product-catalog-prices', form.productId],
     queryFn: ({ signal }) => adminProductService.listCatalogPrices(form.productId as number, signal),
     enabled: Boolean(formOpen && form.productId != null && form.productId > 0),
+  });
+
+  const paymentMethodsQuery = useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: () => orderService.listPaymentMethods(),
+    staleTime: 5 * 60 * 1000,
   });
 
   const formPickerProductQuery = useQuery({
@@ -292,6 +311,9 @@ export default function AdminPriceChangesPage() {
         startAt: row.startAt,
         endAtInput: row.endAt == null ? '' : toDatetimeLocalValue(row.endAt),
         enabled: row.enabled,
+        quantityLimitInput: row.quantityLimit == null ? '' : String(row.quantityLimit),
+        maxPerCustomerInput: row.maxPerCustomer == null ? '' : String(row.maxPerCustomer),
+        requiredPaymentMethodCode: row.requiredPaymentMethodCode ?? '',
       });
       setFormOpen(true);
     },
@@ -315,6 +337,9 @@ export default function AdminPriceChangesPage() {
         startAt: new Date().toISOString(),
         endAtInput: '',
         enabled: true,
+        quantityLimitInput: row.quantityLimit == null ? '' : String(row.quantityLimit),
+        maxPerCustomerInput: row.maxPerCustomer == null ? '' : String(row.maxPerCustomer),
+        requiredPaymentMethodCode: row.requiredPaymentMethodCode ?? '',
       });
       setFormOpen(true);
     },
@@ -328,6 +353,7 @@ export default function AdminPriceChangesPage() {
     if (!Number.isFinite(body.basePrice) || body.basePrice < 0) return 'Giá gốc không hợp lệ.';
     if (body.salePrice != null) {
       if (!Number.isFinite(body.salePrice) || body.salePrice < 0) return 'Giá ưu đãi không hợp lệ.';
+      if (body.salePrice > body.basePrice) return 'Giá ưu đãi phải nhỏ hơn hoặc bằng giá gốc.';
     }
     if (!body.startAt?.trim()) return 'Thời điểm bắt đầu là bắt buộc.';
     const start = new Date(body.startAt);
@@ -336,6 +362,15 @@ export default function AdminPriceChangesPage() {
       const end = new Date(body.endAt);
       if (Number.isNaN(end.getTime())) return 'Thời điểm kết thúc không hợp lệ.';
       if (end.getTime() < start.getTime()) return 'Kết thúc phải sau hoặc bằng bắt đầu.';
+    }
+    if (body.quantityLimit != null && (body.quantityLimit < 1 || !Number.isInteger(body.quantityLimit))) {
+      return 'Số lượng giới hạn phải là số nguyên >= 1.';
+    }
+    if (body.maxPerCustomer != null && (body.maxPerCustomer < 1 || !Number.isInteger(body.maxPerCustomer))) {
+      return 'Số lượng tối đa mỗi khách phải là số nguyên >= 1.';
+    }
+    if (body.requiredPaymentMethodCode != null && body.requiredPaymentMethodCode.length > 64) {
+      return 'Mã phương thức thanh toán không được vượt quá 64 ký tự.';
     }
     return null;
   }, []);
@@ -375,12 +410,27 @@ export default function AdminPriceChangesPage() {
       return;
     }
 
+    const qlParsed = form.quantityLimitInput.trim() === '' ? null : Number(form.quantityLimitInput);
+    const mcParsed = form.maxPerCustomerInput.trim() === '' ? null : Number(form.maxPerCustomerInput);
+    if (qlParsed != null && (Number.isNaN(qlParsed) || !Number.isInteger(qlParsed))) {
+      notify.error('Số lượng giới hạn không hợp lệ (phải là số nguyên >= 1).');
+      return;
+    }
+    if (mcParsed != null && (Number.isNaN(mcParsed) || !Number.isInteger(mcParsed))) {
+      notify.error('Số lượng tối đa mỗi khách không hợp lệ (phải là số nguyên >= 1).');
+      return;
+    }
+    const pmCode = form.requiredPaymentMethodCode.trim().toUpperCase();
+
     const body: ProductPriceChangeUpsert = {
       basePrice: catalogBasePriceVnd,
       salePrice: saleParsed,
       startAt: toIso8601ForApi(form.startAt),
       endAt: form.endAtInput.trim() === '' ? null : fromDatetimeLocalValue(form.endAtInput),
       enabled: Boolean(form.enabled),
+      quantityLimit: qlParsed,
+      maxPerCustomer: mcParsed,
+      requiredPaymentMethodCode: pmCode === '' ? null : pmCode,
     };
 
     const err = validate(body, productId);
@@ -674,6 +724,64 @@ export default function AdminPriceChangesPage() {
               </span>
             </p>
           ) : null}
+
+          {/* Divider */}
+          <div className="md:col-span-2 border-t border-[var(--bg-border)] pt-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Giới hạn &amp; Phương thức thanh toán
+            </p>
+          </div>
+
+          <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+            Tổng số lượng (quota)
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={form.quantityLimitInput}
+              onChange={(e) => setForm((p) => ({ ...p, quantityLimitInput: e.target.value }))}
+              placeholder="Để trống = không giới hạn"
+              className={inputCls}
+            />
+            <span className="text-[10px] font-normal text-[var(--text-muted)]">
+              Tổng số đơn vị được bán theo giá này (≥ 1).
+            </span>
+          </label>
+
+          <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+            Tối đa mỗi khách
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={form.maxPerCustomerInput}
+              onChange={(e) => setForm((p) => ({ ...p, maxPerCustomerInput: e.target.value }))}
+              placeholder="Để trống = không giới hạn"
+              className={inputCls}
+            />
+            <span className="text-[10px] font-normal text-[var(--text-muted)]">
+              Mỗi khách mua tối đa bao nhiêu đơn vị (≥ 1).
+            </span>
+          </label>
+
+          <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)] md:col-span-2">
+            Phương thức thanh toán bắt buộc
+            <select
+              className={inputCls}
+              value={form.requiredPaymentMethodCode}
+              onChange={(e) => setForm((p) => ({ ...p, requiredPaymentMethodCode: e.target.value }))}
+            >
+              <option value="">— Tất cả phương thức —</option>
+              {(paymentMethodsQuery.data ?? []).map((pm) => (
+                <option key={pm.code} value={pm.code}>
+                  {pm.name} ({pm.code})
+                </option>
+              ))}
+            </select>
+            <span className="text-[10px] font-normal text-[var(--text-muted)]">
+              Giá này chỉ áp dụng khi khách thanh toán bằng phương thức đã chọn.
+            </span>
+          </label>
         </div>
       </AddFormShell>
 
@@ -749,29 +857,42 @@ export default function AdminPriceChangesPage() {
           {rows.map((row) => {
             const status = getProgramStatus(row);
             const pcStarted = priceChangeHasReachedStart(row);
-            const dimmed = status === 'expired' || status === 'disabled';
             const sale = row.salePrice;
             const pct =
               sale != null && row.basePrice > 0 ? ((sale - row.basePrice) / row.basePrice) * 100 : null;
+            
+            const cardClasses = clsx(
+              'overflow-hidden rounded-xl border transition-all duration-200 bg-[var(--bg-surface)]',
+              status === 'running' && 'border-[var(--success)] shadow-[0_0_12px_rgba(34,197,94,0.12)] ring-1 ring-[var(--success)]/20',
+              status === 'upcoming' && 'border-[var(--info)]/50 shadow-[0_0_12px_rgba(59,130,246,0.06)]',
+              status === 'disabled' && 'border-[var(--danger)]/30 opacity-60 shadow-none',
+              status === 'expired' && 'border-[var(--bg-border)] opacity-60 shadow-none'
+            );
+
+            const tagContainerClasses = clsx(
+              'flex size-8 items-center justify-center rounded-md transition-colors',
+              status === 'running' && 'bg-[var(--success)]/10 text-[var(--success)]',
+              status === 'upcoming' && 'bg-[var(--info)]/10 text-[var(--info)]',
+              status === 'disabled' && 'bg-[var(--danger)]/10 text-[var(--danger)]',
+              status === 'expired' && 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'
+            );
+
             return (
               <li key={row.id}>
-                <article
-                  className={clsx(
-                    'overflow-hidden rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)]',
-                    'shadow-[var(--card-shadow)] transition-opacity',
-                    dimmed && 'opacity-60'
-                  )}
-                >
+                <article className={cardClasses}>
                   <header className="flex flex-wrap items-center gap-3 border-b border-[var(--bg-border)] px-4 py-3">
-                    <div className="flex size-8 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
+                    <div className={tagContainerClasses}>
                       <Tag className="size-4" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                        {productQuery.data?.productName ?? `Sản phẩm #${row.productId}`}
+                      <p className="flex items-center gap-2 truncate text-sm font-semibold text-[var(--text-primary)]">
+                        <span className="truncate">{productQuery.data?.productName ?? `Sản phẩm #${row.productId}`}</span>
+                        <span className="shrink-0 rounded bg-[var(--bg-elevated)] px-1.5 py-0.5 font-[family-name:var(--font-admin-mono)] text-[10px] font-bold text-[var(--text-muted)] border border-[var(--bg-border)]">
+                          ID #{row.id}
+                        </span>
                       </p>
                       <p className="font-[family-name:var(--font-admin-mono)] text-[11px] text-[var(--text-muted)]">
-                        {formatDateShort(row.startAt)} → {formatDateShort(row.endAt)}
+                        {formatDateTime(row.startAt)} → {formatDateTime(row.endAt)}
                       </p>
                       {row.productVariantId != null ? (
                         <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
@@ -851,11 +972,58 @@ export default function AdminPriceChangesPage() {
                       tone={status === 'running' ? 'success' : status === 'upcoming' ? 'info' : 'default'}
                     />
                     <StatBox
-                      label="% thay đổi"
+                      label="% giảm"
                       value={pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%` : '—'}
                       tone={pct != null && pct < 0 ? 'success' : 'default'}
                     />
                   </div>
+
+                  {/* Quota + Payment method restriction */}
+                  {(row.quantityLimit != null || row.maxPerCustomer != null || row.requiredPaymentMethodCode) && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--bg-border)] px-4 py-2.5">
+                      {row.quantityLimit != null && (
+                        <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                          <span className="font-semibold">Quota:</span>
+                          <span className="font-[family-name:var(--font-admin-mono)]">
+                            {row.soldQuantity ?? 0}/{row.quantityLimit}
+                          </span>
+                          {row.remainingQuantity != null && (
+                            <span className={clsx(
+                              'rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                              row.remainingQuantity === 0
+                                ? 'bg-[var(--danger)]/10 text-[var(--danger)]'
+                                : row.remainingQuantity <= Math.ceil(row.quantityLimit * 0.2)
+                                  ? 'bg-[var(--warning)]/10 text-[var(--warning)]'
+                                  : 'bg-[var(--success)]/10 text-[var(--success)]'
+                            )}>
+                              còn {row.remainingQuantity}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {row.maxPerCustomer != null && (
+                        <div className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
+                          <span className="font-semibold">Tối đa/khách:</span>
+                          <span className="font-[family-name:var(--font-admin-mono)]">{row.maxPerCustomer}</span>
+                        </div>
+                      )}
+                      {row.requiredPaymentMethodCode && (() => {
+                        const pmList = paymentMethodsQuery.data ?? [];
+                        const matchedPm = pmList.find(
+                          (m) => m.code.toUpperCase() === row.requiredPaymentMethodCode?.trim().toUpperCase()
+                        );
+                        return (
+                          <div className="flex items-center gap-1 text-xs">
+                            <CreditCard className="size-3.5 text-blue-500" aria-hidden />
+                            <span className="font-semibold text-blue-600">Chỉ áp dụng với:</span>
+                            <span className="rounded bg-blue-100 px-1.5 py-0.5 font-[family-name:var(--font-admin-mono)] text-[11px] font-bold text-blue-700">
+                              {matchedPm ? `${matchedPm.name} (${row.requiredPaymentMethodCode})` : row.requiredPaymentMethodCode}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </article>
               </li>
             );
@@ -868,7 +1036,7 @@ export default function AdminPriceChangesPage() {
         title="Xóa đợt giá?"
         message={
           deleteTarget
-            ? `Đợt giá #${deleteTarget.id} (bắt đầu ${formatDateShort(deleteTarget.startAt)}) sẽ bị xóa.`
+            ? `Đợt giá #${deleteTarget.id} (bắt đầu ${formatDateTime(deleteTarget.startAt)}) sẽ bị xóa.`
             : ''
         }
         confirmLabel="Xóa"

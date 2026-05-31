@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
@@ -29,7 +29,6 @@ const STATUS_TONE: Record<StatusKey, StatusBadgeTone> = {
   5: 'danger',
 };
 
-/** Các trạng thái kế tiếp hợp lệ theo luồng admin (4 & 5 là terminal). */
 const NEXT_STATUSES: Record<StatusKey, StatusKey[]> = {
   1: [2, 5],
   2: [3, 5],
@@ -125,7 +124,7 @@ function ConfirmDialog({
   );
 }
 
-// ─── Inline status selector ─────────────────────────────────────────────────
+// ─── Inline status selector (fixed-position dropdown — avoids table overflow clipping) ──
 
 function StatusSelector({
   orderId,
@@ -141,6 +140,20 @@ function StatusSelector({
   const nexts = nextStatuses(currentStatus);
   const [open, setOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<StatusKey | null>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        zIndex: 9999,
+      });
+    }
+  }, [open]);
 
   // Terminal status — plain badge, no interaction
   if (nexts.length === 0) {
@@ -149,52 +162,64 @@ function StatusSelector({
 
   return (
     <>
-      <div className="relative inline-block">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          title="Bấm để cập nhật trạng thái"
-          className={clsx(
-            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors',
-            'border-[var(--bg-border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]',
-            'hover:border-[var(--accent)]/50 hover:text-[var(--accent)]'
-          )}
-        >
-          <span
-            className={clsx(
-              'size-1.5 rounded-full',
-              currentStatus === 1 && 'bg-[var(--warning)]',
-              (currentStatus === 2 || currentStatus === 3) && 'bg-[var(--info)]'
-            )}
-            aria-hidden
-          />
-          {statusLabel(currentStatus)}
-          <ChevronDown className="size-3" aria-hidden />
-        </button>
-
-        {open && (
-          <>
-            {/* Backdrop to close */}
-            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-            <div className="absolute left-0 top-full z-20 mt-1 min-w-[11rem] rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] py-1 shadow-lg">
-              <p className="px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Chuyển sang
-              </p>
-              {nexts.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    setOpen(false);
-                    setPendingStatus(s);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-elevated)]"
-                >
-                  <StatusBadge tone={statusTone(s)} label={statusLabel(s)} />
-                </button>
-              ))}
-            </div>
-          </>
+      <button
+        ref={triggerRef}
+        onClick={() => setOpen((v) => !v)}
+        title="Bấm để cập nhật trạng thái"
+        className={clsx(
+          'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors',
+          open
+            ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+            : 'border-[var(--bg-border)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)]'
         )}
-      </div>
+      >
+        <span
+          className={clsx(
+            'size-1.5 rounded-full shrink-0',
+            currentStatus === 1 && 'bg-[var(--warning)]',
+            (currentStatus === 2 || currentStatus === 3) && 'bg-[var(--info,#60a5fa)]'
+          )}
+          aria-hidden
+        />
+        {statusLabel(currentStatus)}
+        <ChevronDown
+          className={clsx('size-3 transition-transform', open && 'rotate-180')}
+          aria-hidden
+        />
+      </button>
+
+      {open && (
+        <>
+          {/* Transparent full-screen backdrop */}
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+
+          {/* Dropdown rendered at fixed coordinates — never clipped by table overflow */}
+          <div
+            style={dropdownStyle}
+            className="min-w-[12rem] rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] py-1 shadow-xl"
+          >
+            <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Chuyển sang
+            </p>
+            {nexts.map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  setOpen(false);
+                  setPendingStatus(s);
+                }}
+                className={clsx(
+                  'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors',
+                  'hover:bg-[var(--bg-elevated)]',
+                  s === 5 && 'text-[var(--danger)]'
+                )}
+              >
+                <StatusBadge tone={statusTone(s)} label={statusLabel(s)} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {pendingStatus !== null && (
         <ConfirmDialog
@@ -297,7 +322,8 @@ export default function AdminOrdersPage() {
           {activeStatus != null ? ` ở trạng thái "${statusLabel(activeStatus)}"` : ''}.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] shadow-[var(--card-shadow)]">
+        /* Table — no overflow:hidden on the card so dropdowns can escape */
+        <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] shadow-[var(--card-shadow)]">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-[var(--bg-border)] bg-[var(--bg-elevated)]/50 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -321,12 +347,9 @@ export default function AdminOrdersPage() {
                         isMutating && 'opacity-60'
                       )}
                     >
-                      {/* Order code */}
                       <td className="px-4 py-3 font-mono text-[var(--text-primary)]">
                         {o.orderCode}
                       </td>
-
-                      {/* Created date */}
                       <td className="px-4 py-3 text-[var(--text-secondary)]">
                         {o.createdDate
                           ? new Date(o.createdDate).toLocaleString('vi-VN', {
@@ -335,8 +358,6 @@ export default function AdminOrdersPage() {
                             })
                           : '—'}
                       </td>
-
-                      {/* Status — interactive dropdown for non-terminal */}
                       <td className="px-4 py-3">
                         {isMutating ? (
                           <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
@@ -352,8 +373,6 @@ export default function AdminOrdersPage() {
                           />
                         )}
                       </td>
-
-                      {/* Payment method + paid status */}
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-xs text-[var(--text-secondary)]">
@@ -374,13 +393,9 @@ export default function AdminOrdersPage() {
                           )}
                         </div>
                       </td>
-
-                      {/* Total */}
                       <td className="px-4 py-3 text-right font-semibold text-[var(--text-primary)]">
                         {formatPrice(o.total)}
                       </td>
-
-                      {/* Detail link */}
                       <td className="px-4 py-3 text-center">
                         <Link
                           to={`/admin/orders/${o.id}`}

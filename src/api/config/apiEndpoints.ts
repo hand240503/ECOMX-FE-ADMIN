@@ -1,6 +1,6 @@
 export const API_ENDPOINTS = {
   AUTH: {
-    LOGIN: '/auth/login',
+    LOGIN: '/auth/admin/login',
     REGISTER: '/auth/register',
     LOGOUT: '/auth/logout',
     REFRESH_TOKEN: '/auth/refresh',
@@ -212,10 +212,25 @@ export const API_ENDPOINTS = {
     DOCUMENT_REPLACE: (id: number | string) => `/admin/document/${id}/replace`,
     /** DELETE — xóa document — @see docs/DOCUMENT_MEDIA_API_FE.md §3 */
     DOCUMENT_BY_ID: (id: number | string) => `/admin/document/${id}`,
+    /** Department management — @see AdminDepartmentController */
+    DEPARTMENTS: '/admin/departments',
+    DEPARTMENT_BY_ID: (id: number | string) => `/admin/departments/${id}`,
+    DEPARTMENT_ADD_MEMBER: (id: number | string, userId: number | string) => `/admin/departments/${id}/members/${userId}`,
+    DEPARTMENT_REMOVE_MEMBER: (id: number | string, userId: number | string) => `/admin/departments/${id}/members/${userId}`,
     /** Admin order management — @see AdminOrderController */
     ORDERS: '/admin/orders',
     ORDER_BY_ID: (id: number | string) => `/admin/orders/${id}`,
     ORDER_UPDATE_STATUS: (id: number | string) => `/admin/orders/${id}/status`,
+    ORDER_UPDATE_RETURN_STATUS: (id: number | string) => `/admin/orders/${id}/return-status`,
+    /** History / audit log — @see AdminHistoryController */
+    HISTORY: '/admin/history',
+    HISTORY_ORDER: (orderId: number | string) => `/admin/history/orders/${orderId}`,
+    HISTORY_ORDER_STATUS: (orderId: number | string) => `/admin/history/orders/${orderId}/status`,
+    HISTORY_ORDER_RETURN: (orderId: number | string) => `/admin/history/orders/${orderId}/return-refund`,
+    HISTORY_ACTIVITY: '/admin/history/activity',
+    HISTORY_ACTIVITY_ENTITY: (type: string, id: number | string) => `/admin/history/activity/entity/${type}/${id}`,
+    /** Lịch sử sự kiện chương trình giá — @see PriceEventHistoryResponse.java */
+    HISTORY_PRICE_EVENTS: '/admin/history/price-events',
   },
 
   /** Backend có nhưng FE hiện chưa dùng */

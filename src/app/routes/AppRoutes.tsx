@@ -29,9 +29,20 @@ import AdminBrandsPage from '../../admin/pages/AdminBrandsPage';
 import AdminCategoriesPage from '../../admin/pages/AdminCategoriesPage';
 import AdminPersonnelListPage from '../../admin/pages/AdminPersonnelListPage';
 import AdminPersonnelFormPage from '../../admin/pages/AdminPersonnelFormPage';
+import AdminStaffFormPage from '../../admin/pages/AdminStaffFormPage';
 import AdminRolesPage from '../../admin/pages/AdminRolesPage';
 import AdminOrdersPage from '../../admin/pages/AdminOrdersPage';
 import AdminOrderDetailPage from '../../admin/pages/AdminOrderDetailPage';
+import AdminHistoryPage from '../../admin/pages/AdminHistoryPage';
+import AdminReturnOrdersPage from '../../admin/pages/AdminReturnOrdersPage';
+import AdminTaskManagementPage from '../../admin/pages/AdminTaskManagementPage';
+import AdminDepartmentListPage from '../../admin/pages/AdminDepartmentListPage';
+import AdminDepartmentFormPage from '../../admin/pages/AdminDepartmentFormPage';
+import ReportDashboardPage from '../../admin/pages/ReportDashboardPage';
+import ReportTopProductsPage from '../../admin/pages/ReportTopProductsPage';
+import AdminProfilePage from '../../admin/pages/AdminProfilePage';
+import { PermissionGate } from '../guards/PermissionGate';
+import { adminAccessControlUi } from '../../lib/adminAccessControlUi';
 function AppRootLayout() {
   return (
     <>
@@ -85,10 +96,38 @@ const router = createBrowserRouter(
         }
       >
         <Route index element={<AdminDashboardPage />} />
-        <Route path="products" element={<AdminProductsPage />} />
-        <Route path="products/create" element={<AdminProductFormPage />} />
-        <Route path="products/featured" element={<AdminProductsCuratedPage kind="featured" />} />
-        <Route path="products/hot-sale" element={<AdminProductsCuratedPage kind="hot-sale" />} />
+        <Route
+          path="products"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewProducts}>
+              <AdminProductsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="products/create"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewProducts}>
+              <AdminProductFormPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="products/featured"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewProducts}>
+              <AdminProductsCuratedPage kind="featured" />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="products/hot-sale"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewProducts}>
+              <AdminProductsCuratedPage kind="hot-sale" />
+            </PermissionGate>
+          }
+        />
         <Route path="products/mix-and-match" element={<Navigate to="/admin/pricing/volume" replace />} />
         <Route
           path="products/purchase-with-purchase"
@@ -96,7 +135,14 @@ const router = createBrowserRouter(
         />
 
         {/* Pricing module (PRICING-UI.md) — sub-sidebar layout */}
-        <Route path="pricing" element={<AdminPricingLayout />}>
+        <Route
+          path="pricing"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewPricing}>
+              <AdminPricingLayout />
+            </PermissionGate>
+          }
+        >
           <Route index element={<Navigate to="/admin/pricing/catalog" replace />} />
           <Route path="catalog" element={<AdminProductCatalogPricesPage />} />
           <Route path="time-change" element={<AdminPriceChangesPage />} />
@@ -111,50 +157,204 @@ const router = createBrowserRouter(
         <Route path="price/price-changes" element={<Navigate to="/admin/pricing/time-change" replace />} />
         <Route path="price/mix-and-match" element={<Navigate to="/admin/pricing/volume" replace />} />
         <Route path="price/purchase-with-purchase" element={<Navigate to="/admin/pricing/pwp" replace />} />
-        <Route path="products/:productId/edit" element={<AdminProductFormPage />} />
-        <Route path="categories" element={<AdminCategoriesPage />} />
-        <Route path="brands" element={<AdminBrandsPage />} />
-        <Route path="orders" element={<Outlet />}>
+
+        <Route
+          path="products/:productId/edit"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewProducts}>
+              <AdminProductFormPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="categories"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewCategories}>
+              <AdminCategoriesPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="brands"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewBrands}>
+              <AdminBrandsPage />
+            </PermissionGate>
+          }
+        />
+
+        <Route
+          path="tasks"
+          element={<AdminTaskManagementPage />}
+        />
+
+        <Route
+          path="orders"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewOrders}>
+              <Outlet />
+            </PermissionGate>
+          }
+        >
           <Route index element={<AdminOrdersPage />} />
           <Route path=":orderId" element={<AdminOrderDetailPage />} />
         </Route>
+
+        <Route
+          path="returns"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewOrders}>
+              <AdminReturnOrdersPage />
+            </PermissionGate>
+          }
+        />
+
         <Route
           path="warehouse"
           element={
-            <AdminPlaceholderPage
-              title="Kho"
-              description="Quản lý tồn kho và phiếu kho."
-              badge="Coming soon"
-            />
+            <PermissionGate canView={adminAccessControlUi.canViewProducts}>
+              <AdminPlaceholderPage
+                title="Kho"
+                description="Quản lý tồn kho và phiếu kho."
+                badge="Coming soon"
+              />
+            </PermissionGate>
           }
         />
-        <Route path="staff" element={<AdminPersonnelListPage variant="staff" />} />
-        <Route path="staff/create" element={<AdminPersonnelFormPage variant="staff" />} />
-        <Route path="staff/:userId/edit" element={<AdminPersonnelFormPage variant="staff" />} />
-        <Route path="employees" element={<AdminPersonnelListPage variant="employee" />} />
-        <Route path="employees/create" element={<AdminPersonnelFormPage variant="employee" />} />
-        <Route path="employees/:userId/edit" element={<AdminPersonnelFormPage variant="employee" />} />
-        <Route path="customers" element={<AdminPersonnelListPage variant="customer" />} />
+
+        {/* Nhân sự & User */}
+        <Route
+          path="staff"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewUsers}>
+              <AdminPersonnelListPage variant="staff" />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="staff/create"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewUsers}>
+              <AdminStaffFormPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="staff/:userId/edit"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewUsers}>
+              <AdminStaffFormPage />
+            </PermissionGate>
+          }
+        />
+        <Route path="employees" element={<Navigate to="/admin/staff" replace />} />
+        <Route path="employees/create" element={<Navigate to="/admin/staff/create" replace />} />
+        <Route path="employees/:userId/edit" element={<Navigate to="/admin/staff" replace />} />
+        <Route
+          path="customers"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewUsers}>
+              <AdminPersonnelListPage variant="customer" />
+            </PermissionGate>
+          }
+        />
         <Route path="customers/create" element={<Navigate to="/admin/customers" replace />} />
-        <Route path="customers/:userId/edit" element={<AdminPersonnelFormPage variant="customer" />} />
+        <Route
+          path="customers/:userId/edit"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewUsers}>
+              <AdminPersonnelFormPage variant="customer" />
+            </PermissionGate>
+          }
+        />
         <Route path="users" element={<Navigate to="/admin/staff" replace />} />
         <Route path="users/create" element={<Navigate to="/admin/staff/create" replace />} />
         <Route path="users/:userId/edit" element={<RedirectLegacyUserEdit />} />
-        <Route path="roles" element={<AdminRolesPage />} />
+
+        <Route
+          path="roles"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewRoles}>
+              <AdminRolesPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* ── Phòng ban (Department) ───────────────────────────────────── */}
+        <Route
+          path="departments"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewDepartments}>
+              <AdminDepartmentListPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="departments/create"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewDepartments}>
+              <AdminDepartmentFormPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="departments/:deptId/edit"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewDepartments}>
+              <AdminDepartmentFormPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="departments/:deptId/members"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewDepartments}>
+              <AdminDepartmentFormPage />
+            </PermissionGate>
+          }
+        />
+
+        <Route
+          path="history"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewHistory}>
+              <AdminHistoryPage />
+            </PermissionGate>
+          }
+        />
         <Route
           path="documents"
-          element={<AdminPlaceholderPage title="Tài liệu / Upload" description="Tải lên và quản lý tài liệu." />}
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewDocuments}>
+              <AdminPlaceholderPage title="Tài liệu / Upload" description="Tải lên và quản lý tài liệu." />
+            </PermissionGate>
+          }
         />
         <Route
           path="reports"
-          element={<AdminPlaceholderPage title="Báo cáo công việc" description="Báo cáo và thống kê." />}
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewReports}>
+              <ReportDashboardPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="reports/top-products"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewReports}>
+              <ReportTopProductsPage />
+            </PermissionGate>
+          }
         />
         <Route
           path="settings"
           element={
-            <AdminPlaceholderPage title="Cấu hình hệ thống" description="Thiết lập hệ thống." badge="Future" />
+            <PermissionGate canView={adminAccessControlUi.canViewSettings}>
+              <AdminPlaceholderPage title="Cấu hình hệ thống" description="Thiết lập hệ thống." badge="Future" />
+            </PermissionGate>
           }
         />
+        <Route path="profile" element={<AdminProfilePage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>
 

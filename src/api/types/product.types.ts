@@ -29,6 +29,8 @@ export interface ProductPrice {
   unitId: number;
   unitName: string;
   unitRatio: number;
+  /** Tên hiển thị tuỳ chỉnh (ví dụ: "Hộp 6 chiếc"). BE trả `display_name`. */
+  displayName?: string | null;
   /** Khớp BE: `product_variant_id` — giá gắn SKU */
   productVariantId?: number | null;
   variant?: ProductVariantPriceRef | null;
@@ -41,6 +43,8 @@ export type ProductPriceUpsertRequest = {
   unit_id?: number;
   current_value: number;
   old_value?: number | null;
+  /** Tên hiển thị tuỳ chỉnh (ví dụ: "Hộp 6 chiếc"). Không bắt buộc. */
+  display_name?: string | null;
 };
 
 /** `docs/API_product_policies_FE.md` — phần tử trong `policies` */
@@ -66,6 +70,8 @@ export type CreatePriceRequest = {
    * FE gửi kèm khi PUT sản phẩm có sẵn `product id` (multipart/JSON đều cùng part `product`).
    */
   product_id?: number;
+  /** Tên hiển thị tuỳ chỉnh — gửi khi tạo giá mới kèm SKU. @see ProductPrice.displayName */
+  display_name?: string | null;
 };
 
 /** Phần tử `updatedPrices[]` khi `PUT /admin/products/{id}`. @see docs/PRODUCT_AND_PRICE_API_FE.md §2a */
@@ -76,6 +82,8 @@ export type UpdateProductPriceItemRequest = {
   unit_id?: number;
   /** Không gửi → giữ `old_value` trên DB */
   old_value?: number;
+  /** Tên hiển thị tuỳ chỉnh — `null` xóa tên; không gửi → giữ nguyên. @see ProductPrice.displayName */
+  display_name?: string | null;
 };
 
 /** Phần tử `variants[]` / `newVariants[]` — @see docs/FE_PRODUCT_VARIANTS.md §2; PUT `newVariants`: @see docs/GUIDE_ADMIN_UPDATE_PRODUCT.md §3.4 */
@@ -281,6 +289,11 @@ export type ProductPriceChange = {
   startAt: string;
   endAt: string | null;
   enabled: boolean;
+  quantityLimit?: number | null;
+  soldQuantity?: number | null;
+  remainingQuantity?: number | null;
+  maxPerCustomer?: number | null;
+  requiredPaymentMethodCode?: string | null;
 };
 
 /**
@@ -294,6 +307,9 @@ export type ProductPriceChangeUpsert = {
   startAt: string;
   endAt: string | null;
   enabled: boolean;
+  quantityLimit?: number | null;
+  maxPerCustomer?: number | null;
+  requiredPaymentMethodCode?: string | null;
 };
 
 /** `GET /products/{id}/detail` — docs/product_api.md */

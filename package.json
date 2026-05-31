@@ -26,6 +26,7 @@
     "react-icons": "^5.5.0",
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.11.0",
+    "recharts": "^3.8.1",
     "tinymce": "^8.5.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.9"

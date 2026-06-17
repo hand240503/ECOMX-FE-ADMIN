@@ -360,7 +360,8 @@ const router = createBrowserRouter(
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Route>
-  )
+  ),
+  { basename: '/admin' }
 );
 
 const AppRoutes = () => {

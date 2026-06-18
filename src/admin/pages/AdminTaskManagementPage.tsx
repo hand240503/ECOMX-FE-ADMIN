@@ -388,6 +388,7 @@ function TaskDrawer({ taskId, departments, onClose }: { taskId: number | null; d
       void qc.invalidateQueries({ queryKey: ['task-detail', taskId] });
       notify.success('Đã hoàn thành task');
     },
+    onError: (err: any) => notify.error(err?.response?.data?.message || 'Hoàn thành task thất bại'),
   });
 
   // ── Update task mutation ──
@@ -407,7 +408,7 @@ function TaskDrawer({ taskId, departments, onClose }: { taskId: number | null; d
       setEditMode(false);
       notify.success('Đã cập nhật task');
     },
-    onError: () => notify.error('Cập nhật thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message || 'Cập nhật thất bại'),
   });
 
   // ── Delete task mutation ──
@@ -418,7 +419,7 @@ function TaskDrawer({ taskId, departments, onClose }: { taskId: number | null; d
       notify.success('Đã xóa task');
       onClose();
     },
-    onError: () => notify.error('Xóa task thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message || 'Xóa task thất bại'),
   });
 
   // ── Cancel task (move to CANCELLED) ──
@@ -429,7 +430,7 @@ function TaskDrawer({ taskId, departments, onClose }: { taskId: number | null; d
       void qc.invalidateQueries({ queryKey: ['task-detail', taskId] });
       notify.success('Task đã bị huỷ');
     },
-    onError: () => notify.error('Huỷ task thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message || 'Huỷ task thất bại'),
   });
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1052,7 +1053,7 @@ function TaskDrawer({ taskId, departments, onClose }: { taskId: number | null; d
             <button
               onClick={() => adminTaskService.moveTask(task!.id, { targetStatus: 'REVIEW', targetPosition: 0 })
                 .then(() => { void qc.invalidateQueries({ queryKey: ['kanban-board'] }); void qc.invalidateQueries({ queryKey: ['task-detail', taskId] }); notify.success('Chuyển sang Review'); })
-                .catch(() => notify.error('Thất bại'))}
+                .catch((err: any) => notify.error(err?.response?.data?.message || 'Thất bại'))}
               disabled={!task || task.status === 'REVIEW' || task.status === 'DONE' || task.status === 'CANCELLED'}
               className="flex h-[32px] items-center gap-[5px] rounded-xl bg-[#FEF9C3] px-3 text-[12px] font-semibold text-[#92400E] hover:brightness-95 disabled:opacity-40 transition-all"
             >
@@ -1282,7 +1283,7 @@ function CreateTaskModal({ boardId, departments, onClose }: { boardId: number; d
       notify.success('Task đã được tạo thành công!');
       onClose();
     },
-    onError: () => notify.error('Tạo task thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message || 'Tạo task thất bại'),
   });
 
   const TAG_COLORS = [
@@ -1889,7 +1890,7 @@ export default function AdminTaskManagementPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['kanban-board'] });
     },
-    onError: () => notify.error('Di chuyển task thất bại'),
+    onError: (err: any) => notify.error(err?.response?.data?.message || 'Di chuyển task thất bại'),
   });
 
   // ── Drag handlers ──

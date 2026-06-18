@@ -17,7 +17,7 @@ const queryClient = new QueryClient({
 const App = () => {
   return (
     <>
-      <Toaster position="bottom-right" toastOptions={{ duration: 4000 }} />
+      <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <RouteLoadingProvider>

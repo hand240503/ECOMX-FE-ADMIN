@@ -52,9 +52,9 @@ const STATUS_TONE: Record<StatusKey, StatusBadgeTone> = {
 };
 
 const NEXT_STATUSES: Record<StatusKey, StatusKey[]> = {
-  1: [2, 5],
-  2: [3, 5],
-  3: [4, 5],
+  1: [2, 5], // Chờ chuẩn bị → Chờ vận chuyển hoặc Đã hủy
+  2: [3],    // Chờ vận chuyển → chỉ tiến tới Chờ giao hàng (không cho hủy)
+  3: [4],    // Chờ giao hàng → chỉ Hoàn thành (không cho hủy)
   4: [],
   5: [],
 };

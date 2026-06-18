@@ -1945,9 +1945,6 @@ export default function AdminTaskManagementPage() {
 
   const VIEWS = [
     { k: 'kanban'   as const, icon: <LayoutGrid   size={13} />, label: 'Kanban'     },
-    { k: 'list'     as const, icon: <ListTodo     size={13} />, label: 'Danh sách'  },
-    { k: 'calendar' as const, icon: <CalendarDays size={13} />, label: 'Lịch'       },
-    { k: 'gantt'    as const, icon: <GanttChart   size={13} />, label: 'Gantt'      },
   ];
 
   return (
@@ -1978,15 +1975,6 @@ export default function AdminTaskManagementPage() {
               <X size={12} />
             </button>
           )}
-        </div>
-
-        <div className="flex items-center gap-[5px]">
-          {['Phòng ban', 'Loại task', 'Ưu tiên', 'Người phụ trách'].map(f => (
-            <button key={f}
-              className="flex h-[30px] items-center gap-[3px] rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] px-[10px] text-[11px] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors">
-              {f} <ChevronDown size={9} />
-            </button>
-          ))}
         </div>
 
         <div className="ml-auto flex items-center gap-2">

@@ -1,59 +1,78 @@
 import type { ReactNode } from 'react';
 
-export type AppToastVariant = 'success' | 'error' | 'info';
+export type AppToastVariant = 'success' | 'error' | 'warning' | 'info';
 
-const variantStyles: Record<
-  AppToastVariant,
-  { wrapper: string; iconWrap: string; icon: ReactNode; title: string }
-> = {
+type VariantStyle = {
+  /** Thanh accent bên trái + nền badge icon (Tailwind class tĩnh để không bị purge). */
+  accent: string;
+  badge: string;
+  title: string;
+  iconRing: string;
+  label: string;
+  icon: ReactNode;
+};
+
+const stroke = {
+  stroke: 'currentColor',
+  strokeWidth: 2.4,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  fill: 'none' as const,
+};
+
+const variantStyles: Record<AppToastVariant, VariantStyle> = {
   success: {
-    wrapper: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-    iconWrap: 'bg-white border-emerald-300 text-emerald-700',
+    accent: 'bg-emerald-500',
+    badge: 'bg-emerald-500',
+    title: 'text-emerald-600',
+    iconRing: 'ring-emerald-100',
+    label: 'Thành công',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
-        <path
-          d="M20 6L9 17l-5-5"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] text-white">
+        <path d="M20 6 9 17l-5-5" {...stroke} />
       </svg>
     ),
-    title: 'Thành công'
   },
   error: {
-    wrapper: 'bg-rose-50 border-rose-200 text-rose-800',
-    iconWrap: 'bg-white border-rose-300 text-rose-700',
+    accent: 'bg-rose-500',
+    badge: 'bg-rose-500',
+    title: 'text-rose-600',
+    iconRing: 'ring-rose-100',
+    label: 'Có lỗi',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
-        <path
-          d="M12 9v4m0 4h.01M10.29 3.86l-8.02 14A2 2 0 004 21h16a2 2 0 001.73-3.14l-8.02-14a2 2 0 00-3.46 0z"
-          stroke="currentColor"
-          strokeWidth="2.1"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] text-white">
+        <path d="M18 6 6 18M6 6l12 12" {...stroke} />
       </svg>
     ),
-    title: 'Có lỗi'
+  },
+  warning: {
+    accent: 'bg-amber-500',
+    badge: 'bg-amber-500',
+    title: 'text-amber-600',
+    iconRing: 'ring-amber-100',
+    label: 'Lưu ý',
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] text-white">
+        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" {...stroke} />
+        <path d="M12 9v4" {...stroke} />
+        <path d="M12 17h.01" {...stroke} />
+      </svg>
+    ),
   },
   info: {
-    wrapper: 'bg-sky-50 border-sky-200 text-sky-800',
-    iconWrap: 'bg-white border-sky-300 text-sky-700',
+    accent: 'bg-sky-500',
+    badge: 'bg-sky-500',
+    title: 'text-sky-600',
+    iconRing: 'ring-sky-100',
+    label: 'Thông báo',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
-        <path
-          d="M12 16v-4m0-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          stroke="currentColor"
-          strokeWidth="2.1"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] text-white">
+        <path d="M12 16v-5" {...stroke} />
+        <path d="M12 8h.01" {...stroke} />
+        <circle cx="12" cy="12" r="9" {...stroke} />
       </svg>
     ),
-    title: 'Thông báo'
-  }
+  },
 };
 
 interface AppToastProps {
@@ -63,37 +82,33 @@ interface AppToastProps {
 }
 
 export default function AppToast({ variant, message, subtitle }: AppToastProps) {
-  const styles = variantStyles[variant];
+  const s = variantStyles[variant];
 
   return (
     <div
-      className={[
-        'w-[min(520px,calc(100vw-32px))]',
-        'rounded-2xl border shadow-[0_16px_40px_-20px_rgba(2,6,23,0.35)]',
-        'px-5 py-4',
-        styles.wrapper
-      ].join(' ')}
+      className="relative flex w-[min(420px,calc(100vw-32px))] items-start gap-3 overflow-hidden rounded-2xl bg-white py-3.5 pl-5 pr-4 shadow-[0_12px_32px_-12px_rgba(2,6,23,0.28)] ring-1 ring-slate-900/5"
       role="status"
       aria-live="polite"
     >
-      <div className="flex items-center gap-4">
-        <div
-          className={[
-            'w-12 h-12 rounded-full border flex items-center justify-center',
-            styles.iconWrap
-          ].join(' ')}
-          aria-hidden="true"
-        >
-          {styles.icon}
-        </div>
+      {/* Thanh accent màu bên trái */}
+      <span className={`absolute inset-y-0 left-0 w-1.5 ${s.accent}`} aria-hidden="true" />
 
-        <div className="min-w-0">
-          <p className="text-sm font-semibold leading-5">{styles.title}</p>
-          <p className="mt-1 text-[15px] font-medium leading-6 break-words">{message}</p>
-          {subtitle ? <p className="mt-0.5 text-sm opacity-80 break-words">{subtitle}</p> : null}
-        </div>
+      {/* Badge icon đặc màu */}
+      <span
+        className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ring-4 ${s.badge} ${s.iconRing}`}
+        aria-hidden="true"
+      >
+        {s.icon}
+      </span>
+
+      {/* Nội dung */}
+      <div className="min-w-0 flex-1 pt-0.5">
+        <p className={`text-[12.5px] font-bold leading-4 ${s.title}`}>{s.label}</p>
+        <p className="mt-1 break-words text-[14px] font-medium leading-snug text-slate-700">{message}</p>
+        {subtitle ? (
+          <p className="mt-0.5 break-words text-[12.5px] leading-snug text-slate-400">{subtitle}</p>
+        ) : null}
       </div>
     </div>
   );
 }
-

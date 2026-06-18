@@ -32,6 +32,7 @@ const show = (variant: AppToastVariant, message: string, options?: NotifyOptions
 export const notify = {
   success: (message: string, options?: NotifyOptions) => show('success', message, options),
   error: (message: string, options?: NotifyOptions) => show('error', message, options),
+  warning: (message: string, options?: NotifyOptions) => show('warning', message, options),
   info: (message: string, options?: NotifyOptions) => show('info', message, options)
 };
 

@@ -1890,8 +1890,15 @@ export default function AdminTaskManagementPage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['kanban-board'] });
     },
-    onError: (err: any) =>
-      notify.error(err?.response?.data?.message || 'Di chuyển task thất bại', { duration: 5000 }),
+    onError: (err: any) => {
+      // Debug: xem onError có chạy + nội dung lỗi (mở DevTools > Console).
+      console.error('[moveMut] onError', err?.response?.status, err?.response?.data);
+      const msg = err?.response?.data?.message
+        || err?.response?.data?.errors?.[0]?.message
+        || err?.message
+        || 'Di chuyển task thất bại';
+      notify.error(msg, { duration: 5000 });
+    },
   });
 
   // ── Drag handlers ──

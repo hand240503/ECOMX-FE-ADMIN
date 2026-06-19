@@ -35,7 +35,6 @@ import AdminOrdersPage from '../../admin/pages/AdminOrdersPage';
 import AdminOrderDetailPage from '../../admin/pages/AdminOrderDetailPage';
 import AdminHistoryPage from '../../admin/pages/AdminHistoryPage';
 import AdminReturnOrdersPage from '../../admin/pages/AdminReturnOrdersPage';
-import AdminTaskManagementPage from '../../admin/pages/AdminTaskManagementPage';
 import AdminDepartmentListPage from '../../admin/pages/AdminDepartmentListPage';
 import AdminDepartmentFormPage from '../../admin/pages/AdminDepartmentFormPage';
 import ReportDashboardPage from '../../admin/pages/ReportDashboardPage';
@@ -183,10 +182,7 @@ const router = createBrowserRouter(
           }
         />
 
-        <Route
-          path="tasks"
-          element={<AdminTaskManagementPage />}
-        />
+        {/* Route "tasks" (Quản lý công việc) đã được ẩn khỏi giao diện. */}
 
         <Route
           path="orders"

@@ -2,7 +2,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Award,
   Building2,
-  CheckSquare,
   ClipboardList,
   CircleDollarSign,
   FileStack,
@@ -54,11 +53,7 @@ export const adminNavSections: AdminNavSection[] = [
         icon: LayoutDashboard,
 
       },
-      {
-        to: '/admin/tasks',
-        label: 'Quản lý công việc',
-        icon: CheckSquare,
-      },
+      // Quản lý công việc (task) đã được ẩn khỏi giao diện.
     ],
   },
   {

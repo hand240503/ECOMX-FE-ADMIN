@@ -222,6 +222,12 @@ export const API_ENDPOINTS = {
     ORDER_BY_ID: (id: number | string) => `/admin/orders/${id}`,
     ORDER_UPDATE_STATUS: (id: number | string) => `/admin/orders/${id}/status`,
     ORDER_UPDATE_RETURN_STATUS: (id: number | string) => `/admin/orders/${id}/return-status`,
+    /** Quản lý kho — @see AdminInventoryController */
+    INVENTORY_STOCKS: '/admin/inventory/stocks',
+    INVENTORY_VARIANT_STOCK: (variantId: number | string) => `/admin/inventory/variants/${variantId}`,
+    INVENTORY_VARIANT_LEDGER: (variantId: number | string) => `/admin/inventory/variants/${variantId}/ledger`,
+    INVENTORY_IMPORT: '/admin/inventory/import',
+    INVENTORY_ADJUST: '/admin/inventory/adjust',
     /** History / audit log — @see AdminHistoryController */
     HISTORY: '/admin/history',
     HISTORY_ORDER: (orderId: number | string) => `/admin/history/orders/${orderId}`,

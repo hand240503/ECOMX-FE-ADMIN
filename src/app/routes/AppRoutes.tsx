@@ -35,6 +35,7 @@ import AdminOrdersPage from '../../admin/pages/AdminOrdersPage';
 import AdminOrderDetailPage from '../../admin/pages/AdminOrderDetailPage';
 import AdminHistoryPage from '../../admin/pages/AdminHistoryPage';
 import AdminReturnOrdersPage from '../../admin/pages/AdminReturnOrdersPage';
+import AdminWarehousePage from '../../admin/pages/AdminWarehousePage';
 import AdminDepartmentListPage from '../../admin/pages/AdminDepartmentListPage';
 import AdminDepartmentFormPage from '../../admin/pages/AdminDepartmentFormPage';
 import ReportDashboardPage from '../../admin/pages/ReportDashboardPage';
@@ -209,11 +210,7 @@ const router = createBrowserRouter(
           path="warehouse"
           element={
             <PermissionGate canView={adminAccessControlUi.canViewProducts}>
-              <AdminPlaceholderPage
-                title="Kho"
-                description="Quản lý tồn kho và phiếu kho."
-                badge="Coming soon"
-              />
+              <AdminWarehousePage />
             </PermissionGate>
           }
         />

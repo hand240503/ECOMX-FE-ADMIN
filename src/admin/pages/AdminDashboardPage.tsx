@@ -12,9 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts';
 import {
   TrendingUp,
@@ -39,8 +36,6 @@ import {
   CircleDollarSign,
   Warehouse,
   History,
-  Settings,
-  FileStack,
   ClipboardList,
 } from 'lucide-react';
 import { adminOrderService } from '../../api/services/adminOrderService';
@@ -73,6 +68,17 @@ function fmtCount(n: number | null | undefined): string {
 
 type DayRange = 7 | 30 | 90;
 
+/** Đơn đã được CHẤP NHẬN trả hàng trở đi (2=chấp nhận, 3=đang hoàn, 4=đã hoàn tiền) — coi là hoàn hàng, KHÔNG tính doanh thu. */
+function isReturnedOrder(o: OrderDto): boolean {
+  const s = o.returnRefundStatus;
+  return s === 2 || s === 3 || s === 4;
+}
+
+/** Đơn tính vào doanh thu / "hoàn thành": đã hoàn thành (status=4) và CHƯA bị hoàn hàng. */
+function isRevenueOrder(o: OrderDto): boolean {
+  return o.status === 4 && !isReturnedOrder(o);
+}
+
 function buildRevenueData(orders: OrderDto[], days: DayRange) {
   const now = new Date();
   const cutoff = startOfDay(subDays(now, days - 1));
@@ -84,7 +90,7 @@ function buildRevenueData(orders: OrderDto[], days: DayRange) {
   }
 
   for (const o of orders) {
-    if (o.status !== 4) continue;
+    if (!isRevenueOrder(o)) continue;
     if (!o.createdDate) continue;
     const d = parseISO(o.createdDate);
     if (!isAfter(d, cutoff) && format(d, 'dd/MM') !== format(cutoff, 'dd/MM')) continue;
@@ -326,100 +332,6 @@ function RevenueChart({ orders, loading }: { orders: OrderDto[]; loading: boolea
 }
 
 // ─── Status Donut ─────────────────────────────────────────────────────────────
-
-function StatusDonut({ orders, loading }: { orders: OrderDto[]; loading: boolean }) {
-  const data = useMemo(() => {
-    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    for (const o of orders) {
-      const s = o.status ?? 0;
-      if (s in counts) counts[s]++;
-    }
-    return Object.entries(counts)
-      .map(([s, count]) => ({
-        status: Number(s),
-        count,
-        ...STATUS_CONFIG[Number(s)],
-      }))
-      .filter((d) => d.count > 0);
-  }, [orders]);
-
-  const total = data.reduce((s, d) => s + d.count, 0);
-
-  return (
-    <div className={clsx(card, 'p-5')}>
-      <p className="mb-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-        <ShoppingCart className="mr-1 inline size-3" /> Đơn theo trạng thái
-      </p>
-      <p className="mb-4 text-xs text-[var(--text-muted)]">Phân bổ tất cả đơn hàng</p>
-
-      {loading ? (
-        <Skeleton className="mx-auto h-36 w-36 rounded-full" />
-      ) : total === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 text-[var(--text-muted)]">
-          <ShoppingCart className="mb-2 size-8 opacity-40" />
-          <p className="text-sm">Chưa có đơn hàng</p>
-        </div>
-      ) : (
-        <>
-          <div className="flex justify-center">
-            <div style={{ width: 160, height: 160 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={72}
-                    paddingAngle={2}
-                    dataKey="count"
-                    strokeWidth={0}
-                  >
-                    {data.map((entry) => (
-                      <Cell key={entry.status} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v: number, _: string, p: { payload: { label: string } }) => [
-                      `${v} đơn (${Math.round((v / total) * 100)}%)`,
-                      p.payload.label,
-                    ]}
-                    contentStyle={{
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--bg-border)',
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-          <div className="mt-3 space-y-2">
-            {data.map((d) => {
-              const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
-              return (
-                <div key={d.status} className="flex items-center gap-2">
-                  <span
-                    className="size-2 flex-shrink-0 rounded-full"
-                    style={{ backgroundColor: d.color }}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-secondary)]">
-                    {d.label}
-                  </span>
-                  <span className="text-xs font-semibold text-[var(--text-primary)]">
-                    {d.count}
-                  </span>
-                  <span className="w-8 text-right text-xs text-[var(--text-muted)]">{pct}%</span>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 // ─── Recent Orders Table ──────────────────────────────────────────────────────
 
@@ -687,20 +599,7 @@ const QUICK_NAV = [
     bg: 'bg-red-100 dark:bg-red-900/30',
     color: 'text-red-700 dark:text-red-300',
   },
-  {
-    to: '/admin/documents',
-    label: 'Tài liệu',
-    icon: FileStack,
-    bg: 'bg-[var(--bg-elevated)]',
-    color: 'text-[var(--text-secondary)]',
-  },
-  {
-    to: '/admin/settings',
-    label: 'Cài đặt',
-    icon: Settings,
-    bg: 'bg-[var(--bg-elevated)]',
-    color: 'text-[var(--text-secondary)]',
-  },
+  // 'Tài liệu' (/admin/documents) và 'Cài đặt' (/admin/settings) đã được ẩn theo yêu cầu.
 ] as const;
 
 function QuickNavGrid({
@@ -824,7 +723,7 @@ export default function AdminDashboardPage() {
   const ordersLoading = ordersQ.isPending;
 
   const revenue = useMemo(
-    () => orders.filter((o) => o.status === 4).reduce((s, o) => s + (o.total ?? 0), 0),
+    () => orders.filter(isRevenueOrder).reduce((s, o) => s + (o.total ?? 0), 0),
     [orders],
   );
 
@@ -862,10 +761,23 @@ export default function AdminDashboardPage() {
         <StatCard
           label="Doanh thu (đơn hoàn thành)"
           value={ordersLoading ? '…' : fmtRevenue(revenue)}
-          sub={ordersLoading ? undefined : `${orders.filter((o) => o.status === 4).length} đơn hoàn thành`}
+          sub={ordersLoading ? undefined : `${orders.filter(isRevenueOrder).length} đơn hoàn thành`}
           icon={CircleDollarSign}
           iconBg="rgba(34,197,94,0.12)"
           iconColor="var(--success)"
+          loading={ordersLoading}
+        />
+        <StatCard
+          label="Hoàn hàng (đã chấp nhận trả)"
+          value={ordersLoading ? '…' : fmtCount(orders.filter(isReturnedOrder).length)}
+          sub={
+            ordersLoading
+              ? undefined
+              : `${orders.filter((o) => o.returnRefundStatus === 4).length} đơn đã hoàn tiền`
+          }
+          icon={RotateCcw}
+          iconBg="rgba(244,63,94,0.12)"
+          iconColor="var(--danger)"
           loading={ordersLoading}
         />
         <StatCard
@@ -921,9 +833,8 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ── CHARTS ROW ─────────────────────────────────────────────── */}
-      <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
+      <div className="grid gap-4">
         <RevenueChart orders={orders} loading={ordersLoading} />
-        <StatusDonut orders={orders} loading={ordersLoading} />
       </div>
 
       {/* ── RECENT ORDERS TABLE ────────────────────────────────────── */}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { ChevronRight, FolderTree, ImagePlus, Loader2, Search, X } from 'lucide-react';
+import { ChevronRight, FolderTree, ImagePlus, Loader2, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
 import { adminCategoryService } from '../../api/services/adminCategoryService';
 import { adminDocumentService } from '../../api/services/adminDocumentService';
 import { DOCUMENT_ENTITY_TYPE_CATEGORY } from '../constants/documentEntities';
@@ -10,6 +10,8 @@ import { adminCategoryPermissions } from '../../lib/adminCategoryPermissions';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { notify } from '../../utils/notify';
 import { PricingPageHeader } from '../components/pricing/PricingPageHeader';
+import { ExportExcelButton } from '../components/ExportExcelButton';
+import { AdminCatalogImportModal } from '../components/AdminCatalogImportModal';
 import { AddFormShell } from '../components/pricing/AddFormShell';
 import { ADMIN_RECORD_STATUS_LABEL_VI, StatusBadge } from '../components/pricing/StatusBadge';
 
@@ -85,10 +87,12 @@ export default function AdminCategoriesPage() {
   const queryClient = useQueryClient();
   const canCreate = adminCategoryPermissions.canCreate();
   const canUpdate = adminCategoryPermissions.canUpdate();
+  const canDelete = adminCategoryPermissions.canDelete();
 
   const [filter, setFilter] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -323,6 +327,27 @@ export default function AdminCategoriesPage() {
     }
   }, [form, editingId, thumbnailFile, validate, queryClient, closeForm, canCreate, canUpdate]);
 
+  const handleDelete = useCallback(
+    async (c: CategoryResponse) => {
+      if (!canDelete) return;
+      const childCount = c.childrenCount ?? 0;
+      if (childCount > 0) {
+        notify.error(`Không thể xóa "${c.name}": còn ${childCount} danh mục con. Hãy xóa/di chuyển danh mục con trước.`);
+        return;
+      }
+      if (!window.confirm(`Xóa danh mục "${c.name}" (#${c.id})? Hành động này không thể hoàn tác.`)) return;
+      try {
+        await adminCategoryService.remove(c.id);
+        notify.success('Đã xóa danh mục');
+        if (selectedParentId === c.id) setSelectedParentId(null);
+        await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      } catch (e) {
+        notify.error(getApiErrorMessage(e, 'Xóa danh mục thất bại (có thể còn sản phẩm hoặc danh mục con).'));
+      }
+    },
+    [canDelete, selectedParentId, queryClient]
+  );
+
   const inputCls =
     'rounded-lg border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]';
@@ -340,7 +365,27 @@ export default function AdminCategoriesPage() {
 
   return (
     <div className="space-y-5">
-      <PricingPageHeader title="Danh mục" cta={headerCta} />
+      <PricingPageHeader
+        title="Danh mục"
+        cta={headerCta}
+        extra={
+          <>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              >
+                <Upload className="size-4" aria-hidden />
+                Nhập Excel
+              </button>
+            )}
+            <ExportExcelButton fetcher={adminCategoryService.exportXlsx} filePrefix="danh_muc_export" />
+          </>
+        }
+      />
+
+      <AdminCatalogImportModal open={importOpen} onClose={() => setImportOpen(false)} kind="category" />
 
       {/* Form modal */}
       <AddFormShell
@@ -619,19 +664,36 @@ export default function AdminCategoriesPage() {
                   </p>
                 )}
               </div>
-              {canCreate && selectedParentId != null ? (
-                <button
-                  type="button"
-                  onClick={() => openCreate(selectedParentId)}
-                  className={clsx(
-                    'shrink-0 rounded-lg border border-[var(--bg-border)] px-3 py-1.5 text-xs font-semibold',
-                    'text-[var(--accent)] hover:bg-[var(--accent-soft)]',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
-                  )}
-                >
-                  + Thêm danh mục con
-                </button>
-              ) : null}
+              <div className="flex shrink-0 items-center gap-2">
+                {canCreate && selectedParentId != null ? (
+                  <button
+                    type="button"
+                    onClick={() => openCreate(selectedParentId)}
+                    className={clsx(
+                      'shrink-0 rounded-lg border border-[var(--bg-border)] px-3 py-1.5 text-xs font-semibold',
+                      'text-[var(--accent)] hover:bg-[var(--accent-soft)]',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
+                    )}
+                  >
+                    + Thêm danh mục con
+                  </button>
+                ) : null}
+                {canDelete && selectedParent != null ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(selectedParent)}
+                    className={clsx(
+                      'inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--danger)]/40 px-3 py-1.5 text-xs font-semibold',
+                      'text-[var(--danger)] hover:bg-[var(--danger)]/10',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]'
+                    )}
+                    title="Xóa danh mục gốc đang chọn (phải không còn con & sản phẩm)"
+                  >
+                    <Trash2 className="size-3.5" aria-hidden />
+                    Xóa danh mục
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
@@ -667,6 +729,9 @@ export default function AdminCategoriesPage() {
                       <th className="px-4 py-2.5 text-xs font-semibold text-[var(--text-secondary)]">Con</th>
                       <th className="px-4 py-2.5 text-xs font-semibold text-[var(--text-secondary)]">Trạng thái</th>
                       <th className="px-4 py-2.5 text-xs font-semibold text-[var(--text-secondary)]">Cập nhật</th>
+                      {(canUpdate || canDelete) && (
+                        <th className="px-4 py-2.5 text-right text-xs font-semibold text-[var(--text-secondary)]">Thao tác</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -707,6 +772,40 @@ export default function AdminCategoriesPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-xs text-[var(--text-secondary)]">
                           {formatTimestamp(c.modifiedDate ?? c.createdDate)}
                         </td>
+                        {(canUpdate || canDelete) && (
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {canUpdate && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startEdit(c);
+                                  }}
+                                  aria-label={`Sửa ${c.name}`}
+                                  title="Sửa"
+                                  className="rounded-md p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                                >
+                                  <Pencil className="size-4" aria-hidden />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleDelete(c);
+                                  }}
+                                  aria-label={`Xóa ${c.name}`}
+                                  title="Xóa"
+                                  className="rounded-md p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
+                                >
+                                  <Trash2 className="size-4" aria-hidden />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

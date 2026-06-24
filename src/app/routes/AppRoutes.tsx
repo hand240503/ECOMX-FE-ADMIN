@@ -27,6 +27,7 @@ import AdminProductCatalogPricesPage from '../../admin/pages/AdminProductCatalog
 import AdminUnitsPage from '../../admin/pages/AdminUnitsPage';
 import AdminBrandsPage from '../../admin/pages/AdminBrandsPage';
 import AdminCategoriesPage from '../../admin/pages/AdminCategoriesPage';
+import AdminCatalogImportPage from '../../admin/pages/AdminCatalogImportPage';
 import AdminPersonnelListPage from '../../admin/pages/AdminPersonnelListPage';
 import AdminPersonnelFormPage from '../../admin/pages/AdminPersonnelFormPage';
 import AdminStaffFormPage from '../../admin/pages/AdminStaffFormPage';
@@ -35,6 +36,7 @@ import AdminOrdersPage from '../../admin/pages/AdminOrdersPage';
 import AdminOrderDetailPage from '../../admin/pages/AdminOrderDetailPage';
 import AdminHistoryPage from '../../admin/pages/AdminHistoryPage';
 import AdminReturnOrdersPage from '../../admin/pages/AdminReturnOrdersPage';
+import AdminReturnDetailPage from '../../admin/pages/AdminReturnDetailPage';
 import AdminWarehousePage from '../../admin/pages/AdminWarehousePage';
 import AdminDepartmentListPage from '../../admin/pages/AdminDepartmentListPage';
 import AdminDepartmentFormPage from '../../admin/pages/AdminDepartmentFormPage';
@@ -175,10 +177,26 @@ const router = createBrowserRouter(
           }
         />
         <Route
+          path="categories/import"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewCategories}>
+              <AdminCatalogImportPage kind="category" />
+            </PermissionGate>
+          }
+        />
+        <Route
           path="brands"
           element={
             <PermissionGate canView={adminAccessControlUi.canViewBrands}>
               <AdminBrandsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="brands/import"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewBrands}>
+              <AdminCatalogImportPage kind="brand" />
             </PermissionGate>
           }
         />
@@ -201,10 +219,13 @@ const router = createBrowserRouter(
           path="returns"
           element={
             <PermissionGate canView={adminAccessControlUi.canViewOrders}>
-              <AdminReturnOrdersPage />
+              <Outlet />
             </PermissionGate>
           }
-        />
+        >
+          <Route index element={<AdminReturnOrdersPage />} />
+          <Route path=":orderId" element={<AdminReturnDetailPage />} />
+        </Route>
 
         <Route
           path="warehouse"
@@ -353,8 +374,7 @@ const router = createBrowserRouter(
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Route>
-  ),
-  { basename: '/admin' }
+  )
 );
 
 const AppRoutes = () => {

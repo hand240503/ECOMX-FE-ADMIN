@@ -1,7 +1,9 @@
 import { axiosInstance } from '../config/axiosConfig';
 import { API_ENDPOINTS } from '../config/apiEndpoints';
 import type { ApiResponse } from '../types/common.types';
+import type { CatalogImportResponse } from '../types/catalogImport.types';
 import type { CreateUnitRequest, UnitResponse, UpdateUnitRequest } from '../types/unit.types';
+import { downloadTemplateBlob, postImportFile } from './importHelpers';
 
 /**
  * Admin units CRUD — `/{api.prefix}/admin/units`.
@@ -59,5 +61,15 @@ export const adminUnitService = {
       const errMsg = data.errors?.[0]?.message ?? data.message;
       throw new Error(typeof errMsg === 'string' && errMsg.trim() !== '' ? errMsg.trim() : 'Xóa đơn vị thất bại');
     }
+  },
+
+  /** Import/upsert đơn vị tính từ file Excel/CSV/TXT. */
+  async importUnits(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
+    return postImportFile(API_ENDPOINTS.ADMIN.UNITS_IMPORT, file, 'Nhập đơn vị tính thất bại', signal);
+  },
+
+  /** Tải file Excel mẫu import đơn vị tính. */
+  async downloadImportTemplate(signal?: AbortSignal): Promise<Blob> {
+    return downloadTemplateBlob(API_ENDPOINTS.ADMIN.UNITS_IMPORT_TEMPLATE, signal);
   },
 };

@@ -9,6 +9,8 @@ import axios from 'axios';
 import { axiosInstance } from '../config/axiosConfig';
 import { API_ENDPOINTS } from '../config/apiEndpoints';
 import type { ApiResponse } from '../types/common.types';
+import type { CatalogImportResponse } from '../types/catalogImport.types';
+import { downloadTemplateBlob, postImportFile } from './importHelpers';
 import type {
   AdminUserResponse,
   AdminUsersListResult,
@@ -318,5 +320,16 @@ export const adminInternalStaffService = {
     } catch (err) {
       throw new Error(parseApiErrorMessage(err, 'Xóa nhân viên nội bộ thất bại'));
     }
+  },
+
+  // ── Import bằng Excel/CSV/TXT ────────────────────────────────────────────────
+  /** Import/upsert nhân viên nội bộ từ file. Không xóa, không đổi mật khẩu khi cập nhật. */
+  async importStaff(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
+    return postImportFile(API_ENDPOINTS.ADMIN.STAFF_IMPORT, file, 'Nhập nhân viên nội bộ thất bại', signal);
+  },
+
+  /** Tải file Excel mẫu import nhân viên. */
+  async downloadImportTemplate(signal?: AbortSignal): Promise<Blob> {
+    return downloadTemplateBlob(API_ENDPOINTS.ADMIN.STAFF_IMPORT_TEMPLATE, signal);
   },
 };

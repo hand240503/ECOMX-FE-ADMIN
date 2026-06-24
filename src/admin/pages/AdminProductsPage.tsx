@@ -1,12 +1,14 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { Plus, Search, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Download, Plus, Search, Upload, X } from 'lucide-react';
 import { adminProductService } from '../../api/services/adminProductService';
 import { categoryService } from '../../api/services/categoryService';
 import { flattenCategories } from '../../lib/categoryCatalog';
 import { AdminProductsDataTable } from '../components/AdminProductsDataTable';
+import { AdminProductImportModal } from '../components/AdminProductImportModal';
 
 export default function AdminProductsPage() {
   // ── URL params — page đồng bộ với ?page=N (1-based trong URL, 0-based nội bộ) ──
@@ -33,6 +35,50 @@ export default function AdminProductsPage() {
 
   const [limit, setLimit] = useState(10);
   const [categoryId, setCategoryId] = useState<number | ''>('');
+  const [importOpen, setImportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      const blob = await adminProductService.exportProducts();
+      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `san_pham_export_${ts}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Xuất Excel thất bại');
+    } finally {
+      setExporting(false);
+    }
+  }, []);
+
+  const [exportingIncomplete, setExportingIncomplete] = useState(false);
+  const handleExportIncomplete = useCallback(async () => {
+    setExportingIncomplete(true);
+    try {
+      const blob = await adminProductService.exportIncompleteProducts();
+      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `san_pham_chua_hoan_thien_${ts}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Xuất sản phẩm chưa hoàn thiện thất bại');
+    } finally {
+      setExportingIncomplete(false);
+    }
+  }, []);
 
   // ── Search ──────────────────────────────────────────────────────────────
   const [searchRaw, setSearchRaw] = useState('');
@@ -135,18 +181,68 @@ export default function AdminProductsPage() {
             Sản phẩm
           </h1>
         </div>
-        <Link
-          to="/admin/products/create"
-          className={clsx(
-            'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white',
-            'bg-[var(--accent)] hover:brightness-110',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
-          )}
-        >
-          <Plus className="size-4" aria-hidden />
-          Tạo sản phẩm
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleExport()}
+            disabled={exporting}
+            className={clsx(
+              'inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2.5 text-sm font-semibold',
+              'text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] disabled:opacity-50',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
+            )}
+          >
+            <Download className="size-4" aria-hidden />
+            {exporting ? 'Đang xuất…' : 'Xuất Excel'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportIncomplete()}
+            disabled={exportingIncomplete}
+            title="Sản phẩm chưa có biến thể hoặc chưa có giá"
+            className={clsx(
+              'inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2.5 text-sm font-semibold',
+              'text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] disabled:opacity-50',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
+            )}
+          >
+            <Download className="size-4" aria-hidden />
+            {exportingIncomplete ? 'Đang xuất…' : 'Xuất SP chưa hoàn thiện'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className={clsx(
+              'inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2.5 text-sm font-semibold',
+              'text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
+            )}
+          >
+            <Upload className="size-4" aria-hidden />
+            Tải sản phẩm lên
+          </button>
+          <Link
+            to="/admin/products/create"
+            className={clsx(
+              'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white',
+              'bg-[var(--accent)] hover:brightness-110',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
+            )}
+          >
+            <Plus className="size-4" aria-hidden />
+            Tạo sản phẩm
+          </Link>
+        </div>
       </div>
+
+      <AdminProductImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => {
+          void queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+          void queryClient.invalidateQueries({ queryKey: ['admin-products-search-all'] });
+        }}
+      />
 
       {/* Filter card */}
       <div className="flex flex-col gap-3 rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-4 sm:flex-row sm:flex-wrap sm:items-end">

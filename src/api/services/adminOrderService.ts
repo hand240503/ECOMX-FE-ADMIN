@@ -92,4 +92,22 @@ export const adminOrderService = {
       throw new Error(parseApiErrorMessage(error, 'Không cập nhật được trạng thái trả hàng'));
     }
   },
+
+  /**
+   * DELETE /admin/orders/{id}/return-media/{mediaId}
+   * Yêu cầu quyền UPDATE_ORDER (500003). Xoá 1 ảnh / video bằng chứng trả hàng.
+   */
+  async deleteReturnMedia(id: number, mediaId: number): Promise<OrderDto> {
+    try {
+      const { data } = await axiosInstance.delete<ApiResponse<OrderDto>>(
+        API_ENDPOINTS.ADMIN.ORDER_DELETE_RETURN_MEDIA(id, mediaId)
+      );
+      if (!data.success || data.data === undefined) {
+        throw new Error(data.message || 'Không xoá được ảnh / video');
+      }
+      return data.data;
+    } catch (error) {
+      throw new Error(parseApiErrorMessage(error, 'Không xoá được ảnh / video'));
+    }
+  },
 };

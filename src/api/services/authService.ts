@@ -177,16 +177,6 @@ export const authService = {
     return response.data.message;
   },
 
-  changePassword: async (data: ChangePasswordRequest): Promise<string> => {
-    const response = await axiosInstance.post<ApiResponse<void>>(API_ENDPOINTS.USER.CHANGE_PASSWORD, data);
-
-    if (!response.data.success) {
-      throw new Error(response.data.message || 'Doi mat khau that bai');
-    }
-
-    return response.data.message;
-  },
-
   changeContact: async (data: ChangeContactRequest): Promise<AuthResponse> => {
     const response = await axiosInstance.post<LoginResponse>(API_ENDPOINTS.USER.CHANGE_CONTACT, data);
 

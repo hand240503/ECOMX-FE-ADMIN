@@ -162,8 +162,43 @@ export const API_ENDPOINTS = {
     CUSTOMERS: '/admin/customers',
     CUSTOMER_BY_ID: (id: number | string) => `/admin/customers/${id}`,
     STAFF_RESET_PASSWORD: (id: number | string) => `/admin/staff/${id}/reset-password`,
+    /** Import/upsert nhan vien noi bo tu Excel/CSV/TXT (multipart `file`) + tai file mau */
+    STAFF_IMPORT: '/admin/staff/import',
+    STAFF_IMPORT_TEMPLATE: '/admin/staff/import/template',
     PRODUCTS: '/admin/products',
     PRODUCT_BY_ID: (id: number | string) => `/admin/products/${id}`,
+    // Import / export sản phẩm
+    PRODUCTS_IMPORT: '/admin/products/import',
+    PRODUCTS_IMPORT_PREVIEW: '/admin/products/import/preview',
+    PRODUCTS_IMPORT_TEMPLATE: '/admin/products/import/template',
+    PRODUCTS_EXPORT: '/admin/products/export',
+    PRODUCTS_EXPORT_INCOMPLETE: '/admin/products/export/incomplete',
+    // Đánh dấu nổi bật / hot-sale bằng Excel (multipart `file`) + tải file mẫu
+    PRODUCTS_FEATURED_IMPORT: '/admin/products/featured/import',
+    PRODUCTS_FEATURED_IMPORT_TEMPLATE: '/admin/products/featured/import/template',
+    PRODUCTS_HOTSALE_IMPORT: '/admin/products/hot-sale/import',
+    PRODUCTS_HOTSALE_IMPORT_TEMPLATE: '/admin/products/hot-sale/import/template',
+    // Brand import / export
+    BRANDS_EXPORT: '/admin/brands/export',
+    BRANDS_IMPORT: '/admin/brands/import',
+    BRANDS_IMPORT_PREVIEW: '/admin/brands/import/preview',
+    // Category import / export
+    CATEGORIES_EXPORT: '/admin/categories/export',
+    CATEGORIES_IMPORT: '/admin/categories/import',
+    CATEGORIES_IMPORT_PREVIEW: '/admin/categories/import/preview',
+    // Inventory import
+    INVENTORY_IMPORT_EXCEL: '/admin/inventory/import/excel',
+    INVENTORY_IMPORT_TEMPLATE: '/admin/inventory/import/template',
+    // Promotion import
+    PROMO_PRICE_CHANGE_IMPORT: '/admin/promotions/price-changes/import',
+    PROMO_PRICE_CHANGE_IMPORT_TEMPLATE: '/admin/promotions/price-changes/import/template',
+    PROMO_PWP_IMPORT: '/admin/promotions/purchase-with-purchase/import',
+    PROMO_PWP_IMPORT_TEMPLATE: '/admin/promotions/purchase-with-purchase/import/template',
+    PROMO_VOLUME_TIER_IMPORT: '/admin/promotions/volume-price-tiers/import',
+    PROMO_VOLUME_TIER_IMPORT_TEMPLATE: '/admin/promotions/volume-price-tiers/import/template',
+    // Order: xóa media trả hàng
+    ORDER_DELETE_RETURN_MEDIA: (id: number | string, mediaId: number | string) =>
+      `/admin/orders/${id}/return-media/${mediaId}`,
     PRODUCTS_BY_CATEGORY: (categoryId: number | string) => `/admin/products/category/${categoryId}`,
     /** Daily product catalog prices (PriceEntity) */
     PRODUCT_PRICES: (productId: number | string) => `/admin/products/${productId}/prices`,
@@ -192,6 +227,9 @@ export const API_ENDPOINTS = {
     /** Unit catalog (đơn vị tính) — @see docs/ADMIN_UNITS.md */
     UNITS: '/admin/units',
     UNIT_BY_ID: (id: number | string) => `/admin/units/${id}`,
+    /** Import/upsert don vi tinh tu Excel/CSV/TXT (multipart `file`) + tai file mau */
+    UNITS_IMPORT: '/admin/units/import',
+    UNITS_IMPORT_TEMPLATE: '/admin/units/import/template',
     /** Brand catalog (hãng / thương hiệu) — @see docs/ADMIN_BRANDS.md */
     BRANDS: '/admin/brands',
     BRAND_BY_ID: (id: number | string) => `/admin/brands/${id}`,

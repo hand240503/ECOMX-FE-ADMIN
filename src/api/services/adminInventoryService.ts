@@ -1,6 +1,8 @@
 import { axiosInstance } from '../config/axiosConfig';
 import { API_ENDPOINTS } from '../config/apiEndpoints';
 import type { ApiResponse } from '../types/common.types';
+import type { CatalogImportResponse } from '../types/catalogImport.types';
+import { downloadTemplateBlob, postImportFile } from './importHelpers';
 import type {
   InventoryAdjustRequest,
   InventoryImportRequest,
@@ -70,5 +72,15 @@ export const adminInventoryService = {
       throw new Error(errMsg?.trim() || 'Điều chỉnh tồn kho thất bại');
     }
     return data.data;
+  },
+
+  /** Import tồn kho hàng loạt từ file Excel/CSV/TXT (mode add = cộng thêm, set = đặt tuyệt đối). */
+  async importExcel(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
+    return postImportFile(API_ENDPOINTS.ADMIN.INVENTORY_IMPORT_EXCEL, file, 'Nhập tồn kho thất bại', signal);
+  },
+
+  /** Tải file Excel mẫu để nhập tồn kho. */
+  async downloadImportTemplate(signal?: AbortSignal): Promise<Blob> {
+    return downloadTemplateBlob(API_ENDPOINTS.ADMIN.INVENTORY_IMPORT_TEMPLATE, signal);
   },
 };

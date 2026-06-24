@@ -1,8 +1,9 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { Loader2, Search, PackagePlus, SlidersHorizontal, History, RefreshCw, Boxes } from 'lucide-react';
+import { Loader2, Search, PackagePlus, SlidersHorizontal, History, RefreshCw, Boxes, UploadCloud } from 'lucide-react';
 import { adminInventoryService } from '../../api/services/adminInventoryService';
+import { AdminBulkImportModal } from '../components/AdminBulkImportModal';
 import type {
   InventoryStockResponse,
   InventoryLedgerResponse,
@@ -148,6 +149,7 @@ export default function AdminWarehousePage() {
 
   // Modal lịch sử
   const [ledgerTarget, setLedgerTarget] = useState<InventoryStockResponse | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const stocksQuery = useQuery({
     queryKey: ['admin-inventory-stocks'],
@@ -256,8 +258,29 @@ export default function AdminWarehousePage() {
           <RefreshCw className={clsx('size-3.5', stocksQuery.isFetching && 'animate-spin')} aria-hidden />
           Làm mới
         </button>
+        <button
+          type="button"
+          onClick={() => setImportOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white hover:brightness-110"
+        >
+          <UploadCloud className="size-3.5" aria-hidden />
+          Nhập kho từ Excel
+        </button>
         <p className="text-[11px] text-[var(--text-muted)]">{all.length} SKU</p>
       </div>
+
+      <AdminBulkImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Nhập tồn kho từ Excel"
+        subtitle="Cộng thêm (nhập kho) hoặc đặt tuyệt đối (kiểm kê) theo cột mode"
+        importFn={(f) => adminInventoryService.importExcel(f)}
+        templateFn={() => adminInventoryService.downloadImportTemplate()}
+        templateFileName="mau_import_ton_kho.xlsx"
+        createdLabel="Nhập thêm"
+        updatedLabel="Kiểm kê"
+        onImported={() => void stocksQuery.refetch()}
+      />
 
       {/* Bảng tồn kho */}
       {stocksQuery.isLoading ? (

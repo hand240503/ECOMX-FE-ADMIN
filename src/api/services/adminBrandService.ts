@@ -2,6 +2,7 @@ import { axiosInstance } from '../config/axiosConfig';
 import { API_ENDPOINTS } from '../config/apiEndpoints';
 import type { ApiResponse } from '../types/common.types';
 import type { BrandResponse, CreateBrandRequest, UpdateBrandRequest } from '../types/brand.types';
+import type { CatalogImportResponse } from '../types/catalogImport.types';
 
 /**
  * Admin brands CRUD — `/{api.prefix}/admin/brands`.
@@ -62,4 +63,43 @@ export const adminBrandService = {
       throw new Error(typeof errMsg === 'string' && errMsg.trim() !== '' ? errMsg.trim() : 'Xóa hãng thất bại');
     }
   },
+
+  /** Xuất toàn bộ thương hiệu ra Excel (blob, theo cột CSDL). */
+  async exportXlsx(signal?: AbortSignal): Promise<Blob> {
+    const res = await axiosInstance.get<Blob>(API_ENDPOINTS.ADMIN.BRANDS_EXPORT, {
+      responseType: 'blob',
+      timeout: 120_000,
+      signal,
+    });
+    return res.data;
+  },
+
+  /** Xem trước import thương hiệu (dry-run, không ghi CSDL). */
+  async previewXlsx(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
+    return postCatalogFile(API_ENDPOINTS.ADMIN.BRANDS_IMPORT_PREVIEW, file, 'Xem trước thất bại', signal);
+  },
+
+  /** Import/upsert thương hiệu từ file Excel/CSV/TXT. */
+  async importXlsx(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
+    return postCatalogFile(API_ENDPOINTS.ADMIN.BRANDS_IMPORT, file, 'Nhập thương hiệu thất bại', signal);
+  },
 };
+
+async function postCatalogFile(
+  url: string,
+  file: File,
+  fallbackMsg: string,
+  signal?: AbortSignal
+): Promise<CatalogImportResponse> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const { data } = await axiosInstance.post<ApiResponse<CatalogImportResponse>>(url, fd, {
+    signal,
+    timeout: 120_000,
+  });
+  if (data.success === false || data.data == null) {
+    const errMsg = data.errors?.[0]?.message ?? data.message;
+    throw new Error(typeof errMsg === 'string' && errMsg.trim() !== '' ? errMsg.trim() : fallbackMsg);
+  }
+  return data.data;
+}

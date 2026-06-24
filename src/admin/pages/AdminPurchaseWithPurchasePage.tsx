@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { ArrowRight, Gift, Pause, Pencil, Play, Tag, Trash2 } from 'lucide-react';
+import { ArrowRight, Gift, Pause, Pencil, Play, Tag, Trash2, UploadCloud } from 'lucide-react';
 import { adminProductService } from '../../api/services/adminProductService';
 import { adminPromotionService } from '../../api/services/adminPromotionService';
+import { AdminBulkImportModal } from '../components/AdminBulkImportModal';
 import type { ProductFullResponse } from '../../api/types/product.types';
 import type { PurchaseWithPurchaseOffer, PurchaseWithPurchaseOfferUpsert } from '../../api/types/promotion.types';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -112,6 +113,7 @@ export default function AdminPurchaseWithPurchasePage() {
   }, [productResults, productIds]);
 
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState<PurchaseWithPurchaseOfferUpsert>(emptyDraft);
   const [saving, setSaving] = useState(false);
@@ -264,11 +266,32 @@ export default function AdminPurchaseWithPurchasePage() {
       <PricingPageHeader
         title="Chương trình mua kèm (PwP)"
         subtitle="Sản phẩm điều kiện và sản phẩm đi kèm được liên kết theo từng phân loại. Số lượng điều kiện chỉ tính đúng phân loại đã chọn; mỗi phân loại đi kèm chỉ thuộc tối đa một chương trình."
+        extra={
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--bg-border)] px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+          >
+            <UploadCloud className="size-4" aria-hidden />
+            Nhập Excel
+          </button>
+        }
         cta={{
           label: 'Thêm chương trình',
           onClick: () => (formOpen ? closeForm() : openCreate()),
           open: formOpen,
         }}
+      />
+
+      <AdminBulkImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Nhập chương trình mua kèm (PWP) từ Excel"
+        subtitle="Mỗi dòng = một ưu đãi mua kèm (anchor + companion theo variant_id hoặc sku_code)"
+        importFn={(f) => adminPromotionService.importPurchaseWithPurchase(f)}
+        templateFn={() => adminPromotionService.downloadPwpTemplate()}
+        templateFileName="mau_import_mua_kem.xlsx"
+        onImported={() => void queryClient.invalidateQueries({ queryKey: ['admin-pwp-offers'] })}
       />
 
       <AddFormShell

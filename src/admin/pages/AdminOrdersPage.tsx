@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminOrderService } from '../../api/services/adminOrderService';
 import { StatusBadge } from '../components/pricing/StatusBadge';
@@ -50,6 +50,15 @@ function nextStatuses(s: number): StatusKey[] {
 }
 
 // ─── Filter tabs ────────────────────────────────────────────────────────────
+
+/** Nhãn trạng thái trả hàng hiển thị trong danh sách đơn. */
+const RETURN_BADGE: Record<number, { label: string; cls: string }> = {
+  1: { label: 'Yêu cầu trả', cls: 'border-amber-300/50 bg-amber-100 text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/40 dark:text-amber-300' },
+  2: { label: 'Đang xử lý trả', cls: 'border-blue-300/50 bg-blue-100 text-blue-700 dark:border-blue-800/40 dark:bg-blue-900/40 dark:text-blue-300' },
+  3: { label: 'Đang hoàn tiền', cls: 'border-purple-300/50 bg-purple-100 text-purple-700 dark:border-purple-800/40 dark:bg-purple-900/40 dark:text-purple-300' },
+  4: { label: 'Đã trả hàng', cls: 'border-rose-300/50 bg-rose-100 text-rose-700 dark:border-rose-800/40 dark:bg-rose-900/40 dark:text-rose-300' },
+  5: { label: 'Từ chối trả', cls: 'border-zinc-300/50 bg-zinc-100 text-zinc-600 dark:border-zinc-700/50 dark:bg-zinc-800/60 dark:text-zinc-400' },
+};
 
 const FILTER_TABS: { label: string; value: number | undefined }[] = [
   { label: 'Tất cả', value: undefined },
@@ -359,19 +368,34 @@ export default function AdminOrdersPage() {
                           : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        {isMutating ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                            Đang cập nhật…
-                          </span>
-                        ) : (
-                          <StatusSelector
-                            orderId={o.id}
-                            orderCode={o.orderCode}
-                            currentStatus={o.status ?? 0}
-                            onMutate={handleMutate}
-                          />
-                        )}
+                        <div className="flex flex-col items-start gap-1.5">
+                          {isMutating ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                              Đang cập nhật…
+                            </span>
+                          ) : (
+                            <StatusSelector
+                              orderId={o.id}
+                              orderCode={o.orderCode}
+                              currentStatus={o.status ?? 0}
+                              onMutate={handleMutate}
+                            />
+                          )}
+                          {o.returnRefundStatus != null && RETURN_BADGE[o.returnRefundStatus] && (
+                            <Link
+                              to={`/admin/returns/${o.id}`}
+                              title="Xem xử lý trả hàng"
+                              className={clsx(
+                                'inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-opacity hover:opacity-80',
+                                RETURN_BADGE[o.returnRefundStatus].cls
+                              )}
+                            >
+                              <RotateCcw className="size-3" aria-hidden />
+                              {RETURN_BADGE[o.returnRefundStatus].label}
+                            </Link>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1.5">

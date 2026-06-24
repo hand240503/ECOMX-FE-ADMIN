@@ -162,6 +162,14 @@ export type VnpayTransactionStatusDto = {
   orderId?: number | null;
 };
 
+/** Ảnh / video bằng chứng trả hàng KH gửi kèm. */
+export type OrderReturnMedia = {
+  id?: number;
+  url: string;
+  /** "IMAGE" | "VIDEO" */
+  type: 'IMAGE' | 'VIDEO' | string;
+};
+
 export type CreatedOrder = {
   id: number;
   orderCode: string;
@@ -177,6 +185,8 @@ export type CreatedOrder = {
   /** @see docs/API_add_order.md — trả hàng/hoàn tiền */
   returnRefundStatus?: number | null;
   returnRefundNote?: string | null;
+  /** Ảnh / video bằng chứng KH gửi kèm yêu cầu trả hàng (vắng nếu không có). */
+  returnMedia?: OrderReturnMedia[] | null;
   /** Lý do hủy đơn — có khi status = 5. */
   cancelNote?: string | null;
   createdDate?: string;

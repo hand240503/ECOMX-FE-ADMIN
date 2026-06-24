@@ -22,6 +22,8 @@ import {
   Layers,
   Hash,
   User,
+  RotateCcw,
+  Image as ImageIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminOrderService } from '../../api/services/adminOrderService';
@@ -36,10 +38,10 @@ import type { StatusBadgeTone } from '../components/pricing/StatusBadge';
 type StatusKey = 1 | 2 | 3 | 4 | 5;
 
 const STATUS_LABEL: Record<StatusKey, string> = {
-  1: 'Chờ chuẩn bị',
-  2: 'Chờ vận chuyển',
-  3: 'Chờ giao hàng',
-  4: 'Hoàn thành',
+  1: 'Đơn hàng sẵn sàng',
+  2: 'Giao cho đơn vị vận chuyển',
+  3: 'Đã giao hàng',
+  4: 'Đã thanh toán',
   5: 'Đã hủy',
 };
 
@@ -95,6 +97,40 @@ const sectionTitle =
   'flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-3';
 const pill =
   'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold';
+
+// ─── Return / refund helpers ─────────────────────────────────────────────────
+
+const RETURN_STATUS_LABEL: Record<number, { label: string; cls: string }> = {
+  1: { label: 'Yêu cầu trả', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  2: { label: 'Đã chấp nhận', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+  3: { label: 'Đang hoàn tiền', cls: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
+  4: { label: 'Hoàn tiền xong', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+  5: { label: 'Từ chối trả', cls: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+};
+
+/** Tách returnRefundNote: lý do KH | refundMethod=... | bank=... */
+function parseReturnNote(note?: string | null): { reason: string; meta: { label: string; value: string }[] } {
+  if (!note) return { reason: '', meta: [] };
+  const parts = note.split('|').map((p) => p.trim());
+  const reason = parts.shift() ?? '';
+  const labelMap: Record<string, string> = { refundMethod: 'Hình thức hoàn tiền', bank: 'Ngân hàng', acct: 'Số tài khoản', email: 'Email' };
+  const meta = parts
+    .map((p) => {
+      const eq = p.indexOf('=');
+      if (eq < 0) return null;
+      const key = p.slice(0, eq).trim();
+      const value = p.slice(eq + 1).trim();
+      if (!value) return null;
+      return { label: labelMap[key] ?? key, value };
+    })
+    .filter((x): x is { label: string; value: string } => x !== null);
+  return { reason, meta };
+}
+
+function isReturnVideo(m: { url: string; type?: string }): boolean {
+  if (m.type && m.type.toUpperCase() === 'VIDEO') return true;
+  return /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(m.url);
+}
 
 // ─── Reconciliation helpers ──────────────────────────────────────────────────
 
@@ -730,13 +766,13 @@ export default function AdminOrderDetailPage() {
                     <div
                       className={clsx(
                         'flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold',
-                        order.paid
+                        (order.paid || order.status === 4)
                           ? 'border border-emerald-200/60 bg-emerald-50/60 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-900/15 dark:text-emerald-300'
                           : 'border border-amber-200/60 bg-amber-50/60 text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/15 dark:text-amber-300',
                       )}
                     >
-                      <span className={clsx('size-2 rounded-full', order.paid ? 'bg-emerald-500' : 'bg-amber-500')} />
-                      {order.paid ? (
+                      <span className={clsx('size-2 rounded-full', (order.paid || order.status === 4) ? 'bg-emerald-500' : 'bg-amber-500')} />
+                      {(order.paid || order.status === 4) ? (
                         <>
                           Đã thanh toán
                           {order.paidAt && (
@@ -804,6 +840,90 @@ export default function AdminOrderDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* 5. RETURN / REFUND — chỉ hiện khi đơn có yêu cầu trả hàng */}
+            {order.returnRefundStatus != null && (() => {
+              const rs = order.returnRefundStatus as number;
+              const cfg = RETURN_STATUS_LABEL[rs];
+              const parsed = parseReturnNote(order.returnRefundNote);
+              const media = order.returnMedia ?? [];
+              return (
+                <div className={clsx(card, 'p-5')}>
+                  <p className={sectionTitle}>
+                    <RotateCcw className="size-3.5" />
+                    Trả hàng / hoàn tiền
+                    {cfg && (
+                      <span className={clsx('ml-auto inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold', cfg.cls)}>
+                        {cfg.label}
+                      </span>
+                    )}
+                  </p>
+
+                  {parsed.reason && (
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      <span className="font-medium text-[var(--text-primary)]">Lý do KH: </span>
+                      {parsed.reason}
+                    </p>
+                  )}
+                  {parsed.meta.length > 0 && (
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      {parsed.meta.map((m) => (
+                        <div key={m.label}>
+                          <p className="text-xs text-[var(--text-muted)]">{m.label}</p>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">{m.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Media bằng chứng */}
+                  <div className="mt-4">
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)]">
+                      <ImageIcon className="size-3.5" />
+                      Ảnh / video bằng chứng
+                      <span className="rounded-full bg-[var(--bg-elevated)] px-1.5 py-0.5 text-[10px] font-semibold">{media.length}</span>
+                    </p>
+                    {media.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                        {media.map((m, idx) => {
+                          const video = isReturnVideo(m);
+                          return (
+                            <a
+                              key={m.id ?? idx}
+                              href={m.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group relative aspect-square overflow-hidden rounded-lg border border-[var(--bg-border)] bg-[var(--bg-elevated)]"
+                              title={video ? 'Mở video' : 'Mở ảnh'}
+                            >
+                              {video ? (
+                                <video src={m.url} className="size-full object-cover" muted playsInline preload="metadata" />
+                              ) : (
+                                <img src={m.url} alt={`Bằng chứng ${idx + 1}`} className="size-full object-cover" loading="lazy" />
+                              )}
+                              {video && (
+                                <span className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white">Video</span>
+                              )}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[var(--text-muted)]">Khách hàng không gửi kèm ảnh / video.</p>
+                    )}
+                  </div>
+
+                  <Link
+                    to={`/admin/returns/${order.id}`}
+                    className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)] hover:underline"
+                  >
+                    <RotateCcw className="size-3.5" />
+                    Mở trang xử lý trả hàng
+                    <ArrowRight className="size-3" />
+                  </Link>
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── RIGHT SIDEBAR ────────────────────────────────────────── */}

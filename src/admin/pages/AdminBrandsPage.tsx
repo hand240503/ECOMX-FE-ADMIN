@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { Award, ImagePlus, Loader2, Search, Trash2, X } from 'lucide-react';
+import { Award, ImagePlus, Loader2, Search, Trash2, Upload, X } from 'lucide-react';
 import { adminBrandService } from '../../api/services/adminBrandService';
 import { adminDocumentService } from '../../api/services/adminDocumentService';
 import { DOCUMENT_ENTITY_TYPE_BRAND } from '../constants/documentEntities';
@@ -12,6 +12,8 @@ import { adminBrandPermissions } from '../../lib/adminBrandPermissions';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { notify } from '../../utils/notify';
 import { PricingPageHeader } from '../components/pricing/PricingPageHeader';
+import { ExportExcelButton } from '../components/ExportExcelButton';
+import { AdminCatalogImportModal } from '../components/AdminCatalogImportModal';
 import { AddFormShell } from '../components/pricing/AddFormShell';
 import { ADMIN_RECORD_STATUS_LABEL_VI, StatusBadge } from '../components/pricing/StatusBadge';
 
@@ -62,6 +64,7 @@ export default function AdminBrandsPage() {
 
   const [filter, setFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -293,7 +296,27 @@ export default function AdminBrandsPage() {
 
   return (
     <div className="space-y-6">
-      <PricingPageHeader title="Hãng / Thương hiệu (Brand)" cta={headerCta} />
+      <PricingPageHeader
+        title="Hãng / Thương hiệu (Brand)"
+        cta={headerCta}
+        extra={
+          <>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              >
+                <Upload className="size-4" aria-hidden />
+                Nhập Excel
+              </button>
+            )}
+            <ExportExcelButton fetcher={adminBrandService.exportXlsx} filePrefix="thuong_hieu_export" />
+          </>
+        }
+      />
+
+      <AdminCatalogImportModal open={importOpen} onClose={() => setImportOpen(false)} kind="brand" />
 
       {/* ── Form modal ──────────────────────────────────────────────────────── */}
       <AddFormShell

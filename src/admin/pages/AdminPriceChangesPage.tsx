@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { Copy, CreditCard, Pause, Pencil, Play, Tag, Trash2 } from 'lucide-react';
+import { Copy, CreditCard, Pause, Pencil, Play, Tag, Trash2, UploadCloud } from 'lucide-react';
 import { adminProductService } from '../../api/services/adminProductService';
+import { adminPromotionService } from '../../api/services/adminPromotionService';
+import { AdminBulkImportModal } from '../components/AdminBulkImportModal';
 import { orderService } from '../../api/services/orderService';
 import type { ProductPriceChange, ProductPriceChangeUpsert, ProductFullResponse } from '../../api/types/product.types';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -119,6 +121,7 @@ export default function AdminPriceChangesPage() {
   /** null + có `variants[]` → dùng phần tử đầu sau khi tải product; null không variant → legacy path */
   const [viewVariantId, setViewVariantId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(() => emptyForm(null, null));
   const [saving, setSaving] = useState(false);
@@ -571,7 +574,28 @@ export default function AdminPriceChangesPage() {
     <div className="space-y-6">
       <PricingPageHeader
         title="Giá theo khung thời gian (Price change)"
+        extra={
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--bg-border)] px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+          >
+            <UploadCloud className="size-4" aria-hidden />
+            Nhập Excel
+          </button>
+        }
         cta={{ label: 'Tạo đợt giá', onClick: () => (formOpen ? closeForm() : openCreate()), open: formOpen }}
+      />
+
+      <AdminBulkImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Nhập chương trình đổi giá (PC) từ Excel"
+        subtitle="Mỗi dòng = một đợt đổi giá cho một biến thể (theo variant_id hoặc sku_code)"
+        importFn={(f) => adminPromotionService.importPriceChanges(f)}
+        templateFn={() => adminPromotionService.downloadPriceChangeTemplate()}
+        templateFileName="mau_import_doi_gia.xlsx"
+        onImported={() => void queryClient.invalidateQueries({ queryKey: ['admin-price-changes'] })}
       />
 
       <AddFormShell

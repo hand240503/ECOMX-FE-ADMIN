@@ -337,3 +337,34 @@ export interface AdminDocumentRecord {
   description?: string | null;
   [key: string]: unknown;
 }
+
+export type ProductImportAction = 'CREATE' | 'UPDATE';
+
+/** Kết quả import một sản phẩm — khớp ProductImportRowResult (BE). */
+export interface ProductImportRowResult {
+  rowNumber: number | null;
+  productName: string | null;
+  /** Khóa định danh ổn định để gửi lại lựa chọn CREATE/UPDATE. */
+  key?: string | null;
+  /** Hành động: CREATE = thêm mới, UPDATE = cập nhật. */
+  action?: ProductImportAction | null;
+  /** Sản phẩm đã tồn tại trong CSDL hay chưa. */
+  exists?: boolean;
+  success: boolean;
+  productId: number | null;
+  variantCount: number | null;
+  message: string | null;
+}
+
+/** Tổng hợp kết quả import — khớp ProductImportResponse (BE). */
+export interface ProductImportResponse {
+  totalProducts: number;
+  successCount: number;
+  /** Số SP sẽ/được thêm mới. */
+  createdCount?: number;
+  /** Số SP sẽ/được cập nhật. */
+  updatedCount?: number;
+  failureCount: number;
+  createdVariantCount: number;
+  results: ProductImportRowResult[];
+}

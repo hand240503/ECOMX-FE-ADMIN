@@ -13,9 +13,11 @@ export type PricingPageHeaderProps = {
     open?: boolean;
     disabled?: boolean;
   };
+  /** Phần tử phụ bên phải (vd nút Xuất Excel), hiển thị trước nút cta. */
+  extra?: ReactNode;
 };
 
-export function PricingPageHeader({ title, subtitle, cta }: PricingPageHeaderProps) {
+export function PricingPageHeader({ title, subtitle, cta, extra }: PricingPageHeaderProps) {
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -27,23 +29,28 @@ export function PricingPageHeader({ title, subtitle, cta }: PricingPageHeaderPro
             <p className="mt-1 text-xs text-[var(--text-secondary)]">{subtitle}</p>
           ) : null}
         </div>
-        {cta ? (
-          <button
-            type="button"
-            onClick={cta.onClick}
-            disabled={cta.disabled}
-            className={clsx(
-              'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold',
-              'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]',
-              'disabled:cursor-not-allowed disabled:opacity-50',
-              cta.open
-                ? 'border border-[var(--bg-border)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
-                : 'bg-[var(--accent)] text-white hover:brightness-110'
-            )}
-          >
-            {cta.open ? <X className="size-4" aria-hidden /> : <Plus className="size-4" aria-hidden />}
-            {cta.open ? 'Đóng' : cta.label}
-          </button>
+        {(extra || cta) ? (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {extra}
+            {cta ? (
+              <button
+                type="button"
+                onClick={cta.onClick}
+                disabled={cta.disabled}
+                className={clsx(
+                  'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold',
+                  'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]',
+                  'disabled:cursor-not-allowed disabled:opacity-50',
+                  cta.open
+                    ? 'border border-[var(--bg-border)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
+                    : 'bg-[var(--accent)] text-white hover:brightness-110'
+                )}
+              >
+                {cta.open ? <X className="size-4" aria-hidden /> : <Plus className="size-4" aria-hidden />}
+                {cta.open ? 'Đóng' : cta.label}
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </div>

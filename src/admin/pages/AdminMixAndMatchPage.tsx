@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { Layers, Pause, Pencil, Play, Plus, Trash2, X } from 'lucide-react';
+import { Layers, Pause, Pencil, Play, Plus, Trash2, X, UploadCloud } from 'lucide-react';
 import { adminProductService, type VolumePriceTier } from '../../api/services/adminProductService';
+import { adminPromotionService } from '../../api/services/adminPromotionService';
+import { AdminBulkImportModal } from '../components/AdminBulkImportModal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { notify } from '../../utils/notify';
@@ -30,6 +32,7 @@ export default function AdminMixAndMatchPage() {
   const queryClient = useQueryClient();
   const [viewProductId, setViewProductId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [formProductId, setFormProductId] = useState<number | null>(null);
   const [draft, setDraft] = useState<DraftTier[]>([]);
   const [saving, setSaving] = useState(false);
@@ -194,7 +197,28 @@ export default function AdminMixAndMatchPage() {
     <div className="space-y-6">
       <PricingPageHeader
         title="Giá theo bậc số lượng (Mix & match)"
+        extra={
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--bg-border)] px-3 py-2 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+          >
+            <UploadCloud className="size-4" aria-hidden />
+            Nhập Excel
+          </button>
+        }
         cta={{ label: 'Tạo chương trình', onClick: () => (formOpen ? closeForm() : openCreate()), open: formOpen }}
+      />
+
+      <AdminBulkImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Nhập giá theo số lượng (Mix & Match) từ Excel"
+        subtitle="Mỗi dòng = một mốc giá theo số lượng cho một biến thể (variant_id hoặc sku_code)"
+        importFn={(f) => adminPromotionService.importVolumeTiers(f)}
+        templateFn={() => adminPromotionService.downloadVolumeTierTemplate()}
+        templateFileName="mau_import_mix_match.xlsx"
+        onImported={() => void queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers'] })}
       />
 
       <AddFormShell

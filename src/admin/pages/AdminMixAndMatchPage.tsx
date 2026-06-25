@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
 import { Layers, Pause, Pencil, Play, Plus, Trash2, X, UploadCloud } from 'lucide-react';
 import { adminProductService, type VolumePriceTier } from '../../api/services/adminProductService';
@@ -50,6 +50,48 @@ export default function AdminMixAndMatchPage() {
     queryFn: ({ signal }) => adminProductService.listVolumePriceTiers(viewProductId as number, signal),
     enabled: viewProductId != null,
   });
+
+  // Tổng quan: tất cả sản phẩm đang chạy chương trình Mix & Match (hiển thị ngay khi vào trang).
+  const allQuery = useQuery({
+    queryKey: ['admin-volume-tiers-all'],
+    queryFn: ({ signal }) => adminPromotionService.listAllVolumeTiers(signal),
+  });
+
+  const overviewGroups = useMemo(() => {
+    const groups = new Map<
+      number,
+      { productId: number; tiers: number; enabled: number; variants: Set<number> }
+    >();
+    for (const t of allQuery.data ?? []) {
+      if (t.productId == null || t.productId <= 0) continue;
+      const g =
+        groups.get(t.productId) ?? { productId: t.productId, tiers: 0, enabled: 0, variants: new Set<number>() };
+      g.tiers += 1;
+      if (t.enabled) g.enabled += 1;
+      if (t.productVariantId != null && t.productVariantId > 0) g.variants.add(t.productVariantId);
+      groups.set(t.productId, g);
+    }
+    return [...groups.values()].sort((a, b) => b.enabled - a.enabled || b.tiers - a.tiers);
+  }, [allQuery.data]);
+
+  const overviewProductIds = useMemo(() => overviewGroups.map((g) => g.productId), [overviewGroups]);
+
+  const overviewProductQueries = useQueries({
+    queries: overviewProductIds.map((pid) => ({
+      queryKey: ['admin-product', pid],
+      queryFn: ({ signal }: { signal: AbortSignal }) => adminProductService.getById(pid, signal),
+      staleTime: 60_000,
+    })),
+  });
+
+  const overviewProductNames = useMemo(() => {
+    const map = new Map<number, string>();
+    overviewProductIds.forEach((pid, i) => {
+      const data = overviewProductQueries[i]?.data as { productName?: string } | undefined;
+      if (data?.productName) map.set(pid, data.productName);
+    });
+    return map;
+  }, [overviewProductIds, overviewProductQueries]);
 
   // Load tiers vào draft khi mở form với product
   const formTiersQuery = useQuery({
@@ -137,6 +179,7 @@ export default function AdminMixAndMatchPage() {
       notify.success('Đã lưu bậc giá');
       setViewProductId(formProductId);
       await queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers', formProductId] });
+      void queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers-all'] });
       closeForm();
     } catch (e) {
       notify.error(getApiErrorMessage(e, 'Không lưu được'));
@@ -157,6 +200,7 @@ export default function AdminMixAndMatchPage() {
         );
         notify.success(next ? 'Đã bật toàn bộ bậc giá' : 'Đã tắt toàn bộ bậc giá');
         await queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers', viewProductId] });
+        void queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers-all'] });
       } catch (e) {
         notify.error(getApiErrorMessage(e, 'Không cập nhật được'));
       }
@@ -172,6 +216,7 @@ export default function AdminMixAndMatchPage() {
       notify.success('Đã xóa toàn bộ bậc giá. Sản phẩm về giá catalog.');
       setDeleteOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers', viewProductId] });
+      void queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers-all'] });
     } catch (e) {
       notify.error(getApiErrorMessage(e, 'Không xóa được'));
     } finally {
@@ -218,7 +263,10 @@ export default function AdminMixAndMatchPage() {
         importFn={(f) => adminPromotionService.importVolumeTiers(f)}
         templateFn={() => adminPromotionService.downloadVolumeTierTemplate()}
         templateFileName="mau_import_mix_match.xlsx"
-        onImported={() => void queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers'] })}
+        onImported={() => {
+          void queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers'] });
+          void queryClient.invalidateQueries({ queryKey: ['admin-volume-tiers-all'] });
+        }}
       />
 
       <AddFormShell
@@ -338,9 +386,58 @@ export default function AdminMixAndMatchPage() {
       </div>
 
       {viewProductId == null ? (
-        <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-10 text-center text-sm text-[var(--text-muted)]">
-          Chọn một sản phẩm phía trên để xem chương trình volume.
-        </div>
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+              Tất cả sản phẩm có chương trình Mix &amp; Match
+            </h2>
+            {allQuery.data ? (
+              <span className="text-xs text-[var(--text-muted)]">{overviewGroups.length} sản phẩm</span>
+            ) : null}
+          </div>
+          {allQuery.isLoading ? (
+            <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-secondary)]">
+              Đang tải danh sách…
+            </div>
+          ) : allQuery.isError ? (
+            <div className="rounded-xl border border-[var(--danger)]/40 bg-[var(--bg-surface)] p-6 text-sm text-[var(--danger)]">
+              {getApiErrorMessage(allQuery.error, 'Không tải được danh sách')}
+            </div>
+          ) : overviewGroups.length === 0 ? (
+            <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-10 text-center text-sm text-[var(--text-muted)]">
+              Chưa có sản phẩm nào chạy Mix &amp; Match. Bấm “Tạo chương trình” hoặc “Nhập Excel” để bắt đầu.
+            </div>
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {overviewGroups.map((g) => (
+                <li key={g.productId}>
+                  <button
+                    type="button"
+                    onClick={() => setViewProductId(g.productId)}
+                    className="flex w-full items-center gap-3 rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] px-4 py-3 text-left transition-colors hover:border-[var(--accent)]/60 hover:bg-[var(--bg-elevated)]"
+                  >
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
+                      <Layers className="size-4" aria-hidden />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                        {overviewProductNames.get(g.productId) ?? `Sản phẩm #${g.productId}`}
+                      </p>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        {g.tiers} bậc giá · {g.variants.size} phân loại
+                      </p>
+                    </div>
+                    {g.enabled > 0 ? (
+                      <StatusBadge tone="success" label="Đang bật" />
+                    ) : (
+                      <StatusBadge tone="neutral" label="Đã tắt" />
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       ) : tiersQuery.isLoading ? (
         <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-secondary)]">
           Đang tải…

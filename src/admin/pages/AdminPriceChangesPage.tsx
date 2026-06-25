@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
 import { Copy, CreditCard, Pause, Pencil, Play, Tag, Trash2, UploadCloud } from 'lucide-react';
 import { adminProductService } from '../../api/services/adminProductService';
@@ -188,6 +188,50 @@ export default function AdminPriceChangesPage() {
       }),
     enabled: listCanLoad,
   });
+
+  // Tổng quan: tất cả sản phẩm đang chạy chương trình đổi giá (hiển thị ngay khi vào trang).
+  const allQuery = useQuery({
+    queryKey: ['admin-price-changes-all'],
+    queryFn: ({ signal }) => adminPromotionService.listAllPriceChanges(signal),
+  });
+
+  const overviewProductIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const r of allQuery.data ?? []) {
+      if (r.productId != null && r.productId > 0) ids.add(r.productId);
+    }
+    return [...ids];
+  }, [allQuery.data]);
+
+  const overviewProductQueries = useQueries({
+    queries: overviewProductIds.map((pid) => ({
+      queryKey: ['admin-product', pid],
+      queryFn: ({ signal }: { signal: AbortSignal }) => adminProductService.getById(pid, signal),
+      staleTime: 60_000,
+    })),
+  });
+
+  const overviewProductNames = useMemo(() => {
+    const map = new Map<number, string>();
+    overviewProductIds.forEach((pid, i) => {
+      const data = overviewProductQueries[i]?.data as ProductFullResponse | undefined;
+      if (data?.productName) map.set(pid, data.productName);
+    });
+    return map;
+  }, [overviewProductIds, overviewProductQueries]);
+
+  /** Gom chương trình theo sản phẩm, kèm số đang chạy để hiển thị tổng quan. */
+  const overviewGroups = useMemo(() => {
+    const groups = new Map<number, { productId: number; total: number; running: number }>();
+    for (const r of allQuery.data ?? []) {
+      if (r.productId == null || r.productId <= 0) continue;
+      const g = groups.get(r.productId) ?? { productId: r.productId, total: 0, running: 0 };
+      g.total += 1;
+      if (getProgramStatus(r) === 'running') g.running += 1;
+      groups.set(r.productId, g);
+    }
+    return [...groups.values()].sort((a, b) => b.running - a.running || b.total - a.total);
+  }, [allQuery.data]);
 
   const formCatalogPricesQuery = useQuery({
     queryKey: ['admin-product-catalog-prices', form.productId],
@@ -461,6 +505,7 @@ export default function AdminPriceChangesPage() {
       setViewProductId(productId);
       setViewVariantId(priceChangeScopeOpts.variantId);
       await queryClient.invalidateQueries({ queryKey: ['admin-price-changes', productId] });
+      void queryClient.invalidateQueries({ queryKey: ['admin-price-changes-all'] });
       closeForm();
     } catch (e) {
       notify.error(getApiErrorMessage(e, editingId == null ? 'Không tạo được' : 'Không cập nhật được'));
@@ -518,6 +563,7 @@ export default function AdminPriceChangesPage() {
         );
         notify.success(next ? 'Đã kích hoạt' : 'Đã dừng');
         await queryClient.invalidateQueries({ queryKey: ['admin-price-changes', productIdForApi] });
+        void queryClient.invalidateQueries({ queryKey: ['admin-price-changes-all'] });
       } catch (e) {
         notify.error(getApiErrorMessage(e, 'Không cập nhật được'));
       }
@@ -556,6 +602,7 @@ export default function AdminPriceChangesPage() {
       notify.success('Đã xóa đợt giá');
       setDeleteTarget(null);
       await queryClient.invalidateQueries({ queryKey: ['admin-price-changes', productIdForApi] });
+      void queryClient.invalidateQueries({ queryKey: ['admin-price-changes-all'] });
       if (editingId === target.id) closeForm();
     } catch (e) {
       notify.error(getApiErrorMessage(e, 'Không xóa được'));
@@ -595,7 +642,10 @@ export default function AdminPriceChangesPage() {
         importFn={(f) => adminPromotionService.importPriceChanges(f)}
         templateFn={() => adminPromotionService.downloadPriceChangeTemplate()}
         templateFileName="mau_import_doi_gia.xlsx"
-        onImported={() => void queryClient.invalidateQueries({ queryKey: ['admin-price-changes'] })}
+        onImported={() => {
+          void queryClient.invalidateQueries({ queryKey: ['admin-price-changes'] });
+          void queryClient.invalidateQueries({ queryKey: ['admin-price-changes-all'] });
+        }}
       />
 
       <AddFormShell
@@ -849,9 +899,62 @@ export default function AdminPriceChangesPage() {
 
       {/* Program cards list */}
       {!viewProductIdReady ? (
-        <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-10 text-center text-sm text-[var(--text-muted)]">
-          Chọn một sản phẩm phía trên để xem các đợt giá theo thời gian.
-        </div>
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+              Tất cả sản phẩm có chương trình đổi giá
+            </h2>
+            {allQuery.data ? (
+              <span className="text-xs text-[var(--text-muted)]">{overviewGroups.length} sản phẩm</span>
+            ) : null}
+          </div>
+          {allQuery.isLoading ? (
+            <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-secondary)]">
+              Đang tải danh sách…
+            </div>
+          ) : allQuery.isError ? (
+            <div className="rounded-xl border border-[var(--danger)]/40 bg-[var(--bg-surface)] p-6 text-sm text-[var(--danger)]">
+              {getApiErrorMessage(allQuery.error, 'Không tải được danh sách')}
+            </div>
+          ) : overviewGroups.length === 0 ? (
+            <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-10 text-center text-sm text-[var(--text-muted)]">
+              Chưa có sản phẩm nào chạy chương trình đổi giá. Bấm “Tạo đợt giá” hoặc “Nhập Excel” để bắt đầu.
+            </div>
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {overviewGroups.map((g) => (
+                <li key={g.productId}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewProductId(g.productId);
+                      setViewVariantId(null);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] px-4 py-3 text-left transition-colors hover:border-[var(--accent)]/60 hover:bg-[var(--bg-elevated)]"
+                  >
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
+                      <Tag className="size-4" aria-hidden />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                        {overviewProductNames.get(g.productId) ?? `Sản phẩm #${g.productId}`}
+                      </p>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        {g.total} đợt giá
+                        {g.running > 0 ? ` · ${g.running} đang chạy` : ''}
+                      </p>
+                    </div>
+                    {g.running > 0 ? (
+                      <StatusBadge tone="success" label={`${g.running} đang chạy`} />
+                    ) : (
+                      <StatusBadge tone="neutral" label="Không chạy" />
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       ) : viewProductLoading ? (
         <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-secondary)]">
           Đang tải chi tiết sản phẩm…

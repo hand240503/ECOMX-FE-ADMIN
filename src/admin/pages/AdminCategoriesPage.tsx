@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { ChevronRight, FolderTree, ImagePlus, Loader2, Pencil, Search, Trash2, Upload, X } from 'lucide-react';
+import { ChevronRight, FolderTree, ImagePlus, Loader2, Pencil, Search, Trash2, X } from 'lucide-react';
 import { adminCategoryService } from '../../api/services/adminCategoryService';
 import { adminDocumentService } from '../../api/services/adminDocumentService';
 import { DOCUMENT_ENTITY_TYPE_CATEGORY } from '../constants/documentEntities';
@@ -10,8 +11,6 @@ import { adminCategoryPermissions } from '../../lib/adminCategoryPermissions';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { notify } from '../../utils/notify';
 import { PricingPageHeader } from '../components/pricing/PricingPageHeader';
-import { ExportExcelButton } from '../components/ExportExcelButton';
-import { AdminCatalogImportModal } from '../components/AdminCatalogImportModal';
 import { AddFormShell } from '../components/pricing/AddFormShell';
 import { ADMIN_RECORD_STATUS_LABEL_VI, StatusBadge } from '../components/pricing/StatusBadge';
 
@@ -92,7 +91,6 @@ export default function AdminCategoriesPage() {
   const [filter, setFilter] = useState('');
   const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -331,22 +329,86 @@ export default function AdminCategoriesPage() {
     async (c: CategoryResponse) => {
       if (!canDelete) return;
       const childCount = c.childrenCount ?? 0;
-      if (childCount > 0) {
-        notify.error(`Không thể xóa "${c.name}": còn ${childCount} danh mục con. Hãy xóa/di chuyển danh mục con trước.`);
+      const extra = childCount > 0 ? ` ${childCount} danh mục con sẽ được đưa lên gốc.` : '';
+      if (
+        !window.confirm(
+          `Xóa danh mục "${c.name}" (#${c.id})? Sản phẩm thuộc danh mục này sẽ được gỡ danh mục (để trống).${extra} Hành động này không thể hoàn tác.`
+        )
+      )
         return;
-      }
-      if (!window.confirm(`Xóa danh mục "${c.name}" (#${c.id})? Hành động này không thể hoàn tác.`)) return;
       try {
         await adminCategoryService.remove(c.id);
         notify.success('Đã xóa danh mục');
         if (selectedParentId === c.id) setSelectedParentId(null);
         await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
       } catch (e) {
-        notify.error(getApiErrorMessage(e, 'Xóa danh mục thất bại (có thể còn sản phẩm hoặc danh mục con).'));
+        notify.error(getApiErrorMessage(e, 'Xóa danh mục thất bại.'));
       }
     },
     [canDelete, selectedParentId, queryClient]
   );
+
+  // ── Chọn nhiều + xóa hàng loạt (danh mục con & danh mục gốc) ──────────────
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedRootIds, setSelectedRootIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const makeToggle = (setter: Dispatch<SetStateAction<Set<number>>>) => (id: number) => {
+    setter((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelect = useCallback(makeToggle(setSelectedIds), []);
+  const toggleSelectRoot = useCallback(makeToggle(setSelectedRootIds), []);
+
+  // Lõi xóa hàng loạt dùng chung cho cả danh mục con và danh mục gốc.
+  const runBulkDelete = useCallback(
+    async (ids: number[], clearSelection: () => void) => {
+      if (!canDelete || ids.length === 0) return;
+      if (
+        !window.confirm(
+          `Xóa ${ids.length} danh mục đã chọn? Sản phẩm thuộc các danh mục này sẽ được gỡ danh mục (để trống), danh mục con được đưa lên gốc. Hành động này không thể hoàn tác.`
+        )
+      )
+        return;
+      setBulkDeleting(true);
+      try {
+        const res = await adminCategoryService.bulkRemove(ids);
+        notify.success(
+          `Đã xóa ${res.deleted} danh mục (gỡ ${res.productsDetached} sản phẩm, ${res.childrenDetached} danh mục con lên gốc)`
+        );
+        if (selectedParentId != null && ids.includes(selectedParentId)) setSelectedParentId(null);
+        clearSelection();
+        await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      } catch (e) {
+        notify.error(getApiErrorMessage(e, 'Xóa danh mục hàng loạt thất bại.'));
+      } finally {
+        setBulkDeleting(false);
+      }
+    },
+    [canDelete, selectedParentId, queryClient]
+  );
+
+  const handleBulkDelete = useCallback(
+    () => runBulkDelete(Array.from(selectedIds), () => setSelectedIds(new Set())),
+    [runBulkDelete, selectedIds]
+  );
+  const handleBulkDeleteRoots = useCallback(
+    () => runBulkDelete(Array.from(selectedRootIds), () => setSelectedRootIds(new Set())),
+    [runBulkDelete, selectedRootIds]
+  );
+
+  // Đổi nhóm cha hoặc bộ lọc -> bỏ chọn danh mục con để tránh xóa nhầm dòng không còn hiển thị.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [selectedParentId, filter]);
+  // Đổi bộ lọc -> bỏ chọn danh mục gốc.
+  useEffect(() => {
+    setSelectedRootIds(new Set());
+  }, [filter]);
 
   const inputCls =
     'rounded-lg border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] ' +
@@ -368,24 +430,7 @@ export default function AdminCategoriesPage() {
       <PricingPageHeader
         title="Danh mục"
         cta={headerCta}
-        extra={
-          <>
-            {canCreate && (
-              <button
-                type="button"
-                onClick={() => setImportOpen(true)}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-              >
-                <Upload className="size-4" aria-hidden />
-                Nhập Excel
-              </button>
-            )}
-            <ExportExcelButton fetcher={adminCategoryService.exportXlsx} filePrefix="danh_muc_export" />
-          </>
-        }
       />
-
-      <AdminCatalogImportModal open={importOpen} onClose={() => setImportOpen(false)} kind="category" />
 
       {/* Form modal */}
       <AddFormShell
@@ -600,8 +645,43 @@ export default function AdminCategoriesPage() {
 
           {/* Left: root categories */}
           <aside className="flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] shadow-[var(--card-shadow)]">
-            <div className="border-b border-[var(--bg-border)] px-3 py-2.5">
-              <p className="text-xs font-semibold text-[var(--text-secondary)]">Danh mục gốc</p>
+            <div className="flex items-center justify-between gap-2 border-b border-[var(--bg-border)] px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                {canDelete && filteredRoots.length > 0 && (
+                  <input
+                    type="checkbox"
+                    aria-label="Chọn tất cả danh mục gốc"
+                    className="size-4 cursor-pointer accent-[var(--accent)]"
+                    checked={filteredRoots.every((r) => selectedRootIds.has(r.id))}
+                    ref={(el) => {
+                      if (el)
+                        el.indeterminate =
+                          filteredRoots.some((r) => selectedRootIds.has(r.id)) &&
+                          !filteredRoots.every((r) => selectedRootIds.has(r.id));
+                    }}
+                    onChange={(e) =>
+                      setSelectedRootIds(e.target.checked ? new Set(filteredRoots.map((r) => r.id)) : new Set())
+                    }
+                  />
+                )}
+                <p className="text-xs font-semibold text-[var(--text-secondary)]">Danh mục gốc</p>
+              </div>
+              {canDelete && selectedRootIds.size > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => void handleBulkDeleteRoots()}
+                  disabled={bulkDeleting}
+                  className={clsx(
+                    'inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--danger)]/40 px-2.5 py-1 text-xs font-semibold',
+                    'text-[var(--danger)] hover:bg-[var(--danger)]/10 disabled:opacity-50',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]'
+                  )}
+                  title="Xóa các danh mục gốc đã chọn"
+                >
+                  {bulkDeleting ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Trash2 className="size-3.5" aria-hidden />}
+                  Xóa ({selectedRootIds.size})
+                </button>
+              ) : null}
             </div>
             <div className="flex-1 overflow-y-auto p-2">
               {filteredRoots.length === 0 ? (
@@ -613,7 +693,18 @@ export default function AdminCategoriesPage() {
                   {filteredRoots.map((r) => {
                     const active = r.id === selectedParentId;
                     return (
-                      <li key={r.id}>
+                      <li key={r.id} className="flex items-stretch gap-1.5">
+                        {canDelete && (
+                          <label className="flex shrink-0 cursor-pointer items-center pl-1">
+                            <input
+                              type="checkbox"
+                              aria-label={`Chọn ${r.name}`}
+                              className="size-4 cursor-pointer accent-[var(--accent)]"
+                              checked={selectedRootIds.has(r.id)}
+                              onChange={() => toggleSelectRoot(r.id)}
+                            />
+                          </label>
+                        )}
                         <button
                           type="button"
                           onClick={() => setSelectedParentId(r.id)}
@@ -622,10 +713,12 @@ export default function AdminCategoriesPage() {
                             if (canUpdate) startEdit(r);
                           }}
                           className={clsx(
-                            'flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors',
-                            active
-                              ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-primary)]'
-                              : 'border-transparent hover:bg-[var(--bg-elevated)]/80 text-[var(--text-primary)]',
+                            'flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                            selectedRootIds.has(r.id)
+                              ? 'border-[var(--accent)]/60 bg-[var(--accent)]/5 text-[var(--text-primary)]'
+                              : active
+                                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-primary)]'
+                                : 'border-transparent hover:bg-[var(--bg-elevated)]/80 text-[var(--text-primary)]',
                           )}
                         >
                           <CategoryAvatar
@@ -665,6 +758,22 @@ export default function AdminCategoriesPage() {
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                {canDelete && selectedIds.size > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkDelete()}
+                    disabled={bulkDeleting}
+                    className={clsx(
+                      'inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--danger)]/40 px-3 py-1.5 text-xs font-semibold',
+                      'text-[var(--danger)] hover:bg-[var(--danger)]/10 disabled:opacity-50',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]'
+                    )}
+                    title="Xóa các danh mục đã chọn"
+                  >
+                    {bulkDeleting ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Trash2 className="size-3.5" aria-hidden />}
+                    Xóa đã chọn ({selectedIds.size})
+                  </button>
+                ) : null}
                 {canCreate && selectedParentId != null ? (
                   <button
                     type="button"
@@ -687,7 +796,7 @@ export default function AdminCategoriesPage() {
                       'text-[var(--danger)] hover:bg-[var(--danger)]/10',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]'
                     )}
-                    title="Xóa danh mục gốc đang chọn (phải không còn con & sản phẩm)"
+                    title="Xóa danh mục gốc đang chọn (sản phẩm sẽ được gỡ danh mục, danh mục con đưa lên gốc)"
                   >
                     <Trash2 className="size-3.5" aria-hidden />
                     Xóa danh mục
@@ -723,6 +832,26 @@ export default function AdminCategoriesPage() {
                 <table className="w-full min-w-[560px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-[var(--bg-border)] bg-[var(--bg-elevated)]/40">
+                      {canDelete && (
+                        <th className="w-10 px-4 py-2.5 text-xs font-semibold text-[var(--text-secondary)]">
+                          <input
+                            type="checkbox"
+                            aria-label="Chọn tất cả"
+                            className="size-4 cursor-pointer accent-[var(--accent)]"
+                            checked={filteredChildren.length > 0 && filteredChildren.every((c) => selectedIds.has(c.id))}
+                            ref={(el) => {
+                              if (el)
+                                el.indeterminate =
+                                  filteredChildren.some((c) => selectedIds.has(c.id)) &&
+                                  !filteredChildren.every((c) => selectedIds.has(c.id));
+                            }}
+                            onChange={(e) => {
+                              const all = e.target.checked;
+                              setSelectedIds(all ? new Set(filteredChildren.map((c) => c.id)) : new Set());
+                            }}
+                          />
+                        </th>
+                      )}
                       <th className="px-4 py-2.5 text-xs font-semibold text-[var(--text-secondary)]">ID</th>
                       <th className="px-4 py-2.5 text-xs font-semibold text-[var(--text-secondary)]">Mã</th>
                       <th className="px-4 py-2.5 text-xs font-semibold text-[var(--text-secondary)]">Tên</th>
@@ -744,9 +873,21 @@ export default function AdminCategoriesPage() {
                         }}
                         className={clsx(
                           'border-b border-[var(--bg-border)]/60 transition-colors hover:bg-[var(--bg-elevated)]/40',
+                          selectedIds.has(c.id) ? 'bg-[var(--accent)]/5' : '',
                           canUpdate ? 'cursor-pointer select-none' : ''
                         )}
                       >
+                        {canDelete && (
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              aria-label={`Chọn ${c.name}`}
+                              className="size-4 cursor-pointer accent-[var(--accent)]"
+                              checked={selectedIds.has(c.id)}
+                              onChange={() => toggleSelect(c.id)}
+                            />
+                          </td>
+                        )}
                         <td className="px-4 py-3 font-[family-name:var(--font-admin-mono)] text-xs text-[var(--text-muted)]">
                           {c.id}
                         </td>

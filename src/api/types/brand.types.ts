@@ -24,3 +24,12 @@ export type CreateBrandRequest = {
 
 /** `PUT /admin/brands/{id}` — partial update */
 export type UpdateBrandRequest = Partial<CreateBrandRequest>;
+
+/** Kết quả xóa thương hiệu hàng loạt — khớp BrandBulkDeleteResponse (BE). */
+export type BrandBulkDeleteResponse = {
+  requested: number;
+  deleted: number;
+  /** Số sản phẩm đã được gỡ thương hiệu (set null). */
+  productsDetached: number;
+  notFoundIds: number[];
+};

@@ -4,6 +4,23 @@ import type { ApiResponse } from '../types/common.types';
 import type { CatalogImportResponse } from '../types/catalogImport.types';
 import { downloadTemplateBlob, postImportFile } from './importHelpers';
 import type { PurchaseWithPurchaseOffer, PurchaseWithPurchaseOfferUpsert } from '../types/promotion.types';
+import type { ProductPriceChange } from '../types/product.types';
+import type { VolumePriceTier } from './adminProductService';
+
+/** Chuẩn hóa 1 bậc giá volume từ BE (hỗ trợ cả snake_case product_id / product_variant_id). */
+function normalizeVolumeTier(raw: unknown): VolumePriceTier {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const pid = Number(o.productId ?? o.product_id);
+  const vid = Number(o.productVariantId ?? o.product_variant_id);
+  return {
+    id: Number(o.id),
+    productId: Number.isFinite(pid) && pid > 0 ? pid : 0,
+    productVariantId: Number.isFinite(vid) && vid > 0 ? vid : null,
+    minQuantity: Number(o.minQuantity ?? o.min_quantity ?? 0),
+    unitPrice: Number(o.unitPrice ?? o.unit_price ?? 0),
+    enabled: Boolean(o.enabled),
+  };
+}
 
 export const adminPromotionService = {
   async listPurchaseWithPurchase(signal?: AbortSignal): Promise<PurchaseWithPurchaseOffer[]> {
@@ -66,6 +83,40 @@ export const adminPromotionService = {
         typeof errMsg === 'string' && errMsg.trim() !== '' ? errMsg.trim() : 'Xóa PwP thất bại'
       );
     }
+  },
+
+  // ── Tổng quan: liệt kê tất cả sản phẩm đang chạy chương trình ────────────
+
+  /** Tất cả chương trình đổi giá theo thời gian (mọi sản phẩm/biến thể). */
+  async listAllPriceChanges(signal?: AbortSignal): Promise<ProductPriceChange[]> {
+    const { data } = await axiosInstance.get<ApiResponse<ProductPriceChange[]>>(
+      API_ENDPOINTS.ADMIN.PROMO_PRICE_CHANGES_ALL,
+      { signal }
+    );
+    if (data.success === false) {
+      throw new Error(
+        typeof data.message === 'string' && data.message.trim() !== ''
+          ? data.message.trim()
+          : 'Không tải được danh sách chương trình đổi giá'
+      );
+    }
+    return Array.isArray(data.data) ? data.data : [];
+  },
+
+  /** Tất cả bậc giá theo số lượng (Mix & Match) của mọi sản phẩm/biến thể. */
+  async listAllVolumeTiers(signal?: AbortSignal): Promise<VolumePriceTier[]> {
+    const { data } = await axiosInstance.get<ApiResponse<unknown[]>>(
+      API_ENDPOINTS.ADMIN.PROMO_VOLUME_TIERS_ALL,
+      { signal }
+    );
+    if (data.success === false) {
+      throw new Error(
+        typeof data.message === 'string' && data.message.trim() !== ''
+          ? data.message.trim()
+          : 'Không tải được danh sách bậc giá'
+      );
+    }
+    return Array.isArray(data.data) ? data.data.map(normalizeVolumeTier) : [];
   },
 
   // ── Import bằng Excel/CSV/TXT ────────────────────────────────────────────

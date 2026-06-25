@@ -38,6 +38,7 @@ import {
   Plus,
   RefreshCw,
   Star,
+  Upload,
   X,
 } from 'lucide-react';
 import { adminBrandService } from '../../api/services/adminBrandService';
@@ -46,6 +47,7 @@ import { adminProductService } from '../../api/services/adminProductService';
 import { adminUnitService } from '../../api/services/adminUnitService';
 import { categoryService } from '../../api/services/categoryService';
 import { UnitSelect } from '../components/pricing/UnitSelect';
+import { AdminVariantImportModal } from '../components/AdminVariantImportModal';
 import { flattenCategories } from '../../lib/categoryCatalog';
 import { compactOptionalRichHtml } from '../../lib/compactOptionalRichHtml';
 import { publicDocumentFileUrl } from '../../lib/documentPublicUrl';
@@ -1822,6 +1824,9 @@ export default function AdminProductFormPage() {
 
   const variantsWatched = useWatch({ control, name: 'variants' }) ?? [];
 
+  // Import biến thể bằng Excel (chỉ ở chế độ chỉnh sửa — cần productId).
+  const [variantImportOpen, setVariantImportOpen] = useState(false);
+
   const variantSnapshotById = useMemo(() => {
     const m = new Map<number, VariantInitialSnapshot>();
     const snaps = deriveVariantSnapshotsForAdminEdit(productQuery.data ?? null) ?? [];
@@ -3173,14 +3178,26 @@ export default function AdminProductFormPage() {
                     Mỗi thẻ là một phân loại của sản phẩm. Đơn hàng và đợt giảm giá được liên kết theo phân loại; mã SKU dùng để hiển thị và quản lý kho.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => appendVariant(emptyVariantFormRow(variantFields.length, defaultCatalogUnitStr))}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--bg-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--bg-elevated)]"
-                >
-                  <Plus className="size-3.5" aria-hidden />
-                  Thêm phân loại
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {isEdit && Number.isFinite(pid) && pid > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setVariantImportOpen(true)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--bg-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+                    >
+                      <Upload className="size-3.5" aria-hidden />
+                      Import Excel
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => appendVariant(emptyVariantFormRow(variantFields.length, defaultCatalogUnitStr))}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--bg-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--bg-elevated)]"
+                  >
+                    <Plus className="size-3.5" aria-hidden />
+                    Thêm phân loại
+                  </button>
+                </div>
               </div>
               <div className="space-y-4 pt-3">
                 {variantFields.map((vf, idx) => {
@@ -3955,6 +3972,15 @@ export default function AdminProductFormPage() {
           setGallerySaveConfirmOpen(false);
         }}
       />
+
+      {isEdit && Number.isFinite(pid) && pid > 0 ? (
+        <AdminVariantImportModal
+          open={variantImportOpen}
+          productId={pid}
+          onClose={() => setVariantImportOpen(false)}
+          onImported={() => void productQuery.refetch()}
+        />
+      ) : null}
     </div>
   );
 }

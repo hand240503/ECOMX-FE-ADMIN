@@ -13,11 +13,13 @@ import type {
   ProductPriceUpsertRequest,
   ProductVariantPriceRef,
   UpdateProductRequest,
+  VariantImportResponse,
 } from '../types/product.types';
 
 export type VolumePriceTier = {
   id: number;
   productId: number;
+  productVariantId?: number | null;
   minQuantity: number;
   unitPrice: number;
   enabled: boolean;
@@ -591,6 +593,65 @@ export const adminProductService = {
     return res.data;
   },
 
+  // ── Import BIẾN THỂ (phân loại) cho MỘT sản phẩm (trang chi tiết) ──────────
+
+  /** Xem trước import biến thể của một sản phẩm (dry-run): không ghi CSDL. */
+  async previewImportVariants(
+    productId: number | string,
+    file: File,
+    signal?: AbortSignal
+  ): Promise<VariantImportResponse> {
+    const fd = new FormData();
+    fd.append('file', file);
+    const { data } = await axiosInstance.post<ApiResponse<VariantImportResponse>>(
+      API_ENDPOINTS.ADMIN.PRODUCT_VARIANT_IMPORT_PREVIEW(productId),
+      fd,
+      { signal, timeout: 120_000 }
+    );
+    if (data.success === false || data.data == null) {
+      const errMsg = data.errors?.[0]?.message ?? data.message;
+      throw new Error(
+        typeof errMsg === 'string' && errMsg.trim() !== '' ? errMsg.trim() : 'Xem trước import biến thể thất bại'
+      );
+    }
+    return data.data;
+  },
+
+  /** Import biến thể cho một sản phẩm từ file Excel/CSV/TXT (multipart `file`, tùy chọn `actions`). */
+  async importVariants(
+    productId: number | string,
+    file: File,
+    actions?: Record<string, 'CREATE' | 'UPDATE'>,
+    signal?: AbortSignal
+  ): Promise<VariantImportResponse> {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (actions && Object.keys(actions).length > 0) {
+      fd.append('actions', JSON.stringify(actions));
+    }
+    const { data } = await axiosInstance.post<ApiResponse<VariantImportResponse>>(
+      API_ENDPOINTS.ADMIN.PRODUCT_VARIANT_IMPORT(productId),
+      fd,
+      { signal, timeout: 120_000 }
+    );
+    if (data.success === false || data.data == null) {
+      const errMsg = data.errors?.[0]?.message ?? data.message;
+      throw new Error(
+        typeof errMsg === 'string' && errMsg.trim() !== '' ? errMsg.trim() : 'Import biến thể thất bại'
+      );
+    }
+    return data.data;
+  },
+
+  /** Tải file Excel mẫu (blob) để điền dữ liệu import biến thể. */
+  async downloadVariantImportTemplate(productId: number | string, signal?: AbortSignal): Promise<Blob> {
+    const res = await axiosInstance.get<Blob>(API_ENDPOINTS.ADMIN.PRODUCT_VARIANT_IMPORT_TEMPLATE(productId), {
+      responseType: 'blob',
+      signal,
+    });
+    return res.data;
+  },
+
   /** Xuất toàn bộ sản phẩm ra Excel (blob, theo cột CSDL). */
   async exportProducts(signal?: AbortSignal): Promise<Blob> {
     const res = await axiosInstance.get<Blob>(API_ENDPOINTS.ADMIN.PRODUCTS_EXPORT, {
@@ -599,6 +660,24 @@ export const adminProductService = {
       signal,
     });
     return res.data;
+  },
+
+  /**
+   * Cổng ẩn: xác thực mật khẩu super admin trước khi xuất toàn bộ sản phẩm.
+   * @returns true nếu mật khẩu khớp một tài khoản SUPER_ADMIN, ngược lại false.
+   */
+  async verifySuperAdmin(password: string, signal?: AbortSignal): Promise<boolean> {
+    try {
+      const res = await axiosInstance.post<ApiResponse<boolean>>(
+        API_ENDPOINTS.ADMIN.PRODUCTS_VERIFY_SUPER_ADMIN,
+        { password },
+        { signal }
+      );
+      return res.data?.success === true && res.data?.data === true;
+    } catch {
+      // 403 (sai mật khẩu) → coi như không hợp lệ
+      return false;
+    }
   },
 
   /** Xuất sản phẩm CHƯA HOÀN THIỆN (chưa có biến thể, hoặc biến thể chưa có giá). */
@@ -627,5 +706,20 @@ export const adminProductService = {
   },
   async downloadHotSaleTemplate(signal?: AbortSignal): Promise<Blob> {
     return downloadTemplateBlob(API_ENDPOINTS.ADMIN.PRODUCTS_HOTSALE_IMPORT_TEMPLATE, signal);
+  },
+
+  /** Import Excel để GÁN danh mục/thương hiệu hàng loạt (cột sku + brand_code + category_code). */
+  async importAssignCatalog(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
+    return postImportFile(
+      API_ENDPOINTS.ADMIN.PRODUCTS_ASSIGN_CATALOG_IMPORT,
+      file,
+      'Gán danh mục/thương hiệu thất bại',
+      signal
+    );
+  },
+
+  /** Tải file Excel mẫu cho gán danh mục/thương hiệu hàng loạt. */
+  async downloadAssignCatalogTemplate(signal?: AbortSignal): Promise<Blob> {
+    return downloadTemplateBlob(API_ENDPOINTS.ADMIN.PRODUCTS_ASSIGN_CATALOG_IMPORT_TEMPLATE, signal);
   },
 };

@@ -18,14 +18,16 @@ const COPY: Record<
     title: 'Sản phẩm nổi bật',
     querySuffix: 'featured',
     importTitle: 'Đánh dấu sản phẩm nổi bật từ Excel',
-    importSubtitle: 'Mỗi dòng một sản phẩm (theo sku hoặc product_id) sẽ được bật cờ nổi bật.',
+    importSubtitle:
+      'Mỗi dòng một sản phẩm (theo sku hoặc product_id). Cột value: TRUE/1/Có = bật cờ nổi bật, FALSE/0/Không = gỡ cờ, để trống = mặc định bật.',
     templateFile: 'mau_import_noi_bat.xlsx',
   },
   'hot-sale': {
     title: 'Bán chạy',
     querySuffix: 'hot-sale',
     importTitle: 'Đánh dấu sản phẩm hot-sale từ Excel',
-    importSubtitle: 'Mỗi dòng một sản phẩm (theo sku hoặc product_id) sẽ được bật cờ hot-sale.',
+    importSubtitle:
+      'Mỗi dòng một sản phẩm (theo sku hoặc product_id). Cột value: TRUE/1/Có = bật cờ hot-sale, FALSE/0/Không = gỡ cờ, để trống = mặc định bật.',
     templateFile: 'mau_import_hot_sale.xlsx',
   },
 };
@@ -142,6 +144,7 @@ export default function AdminProductsCuratedPage({ kind }: { kind: AdminProducts
         }
         templateFileName={templateFile}
         createdLabel="Đã đánh dấu"
+        updatedLabel="Đã gỡ"
         onImported={() => void listQuery.refetch()}
       />
     </div>

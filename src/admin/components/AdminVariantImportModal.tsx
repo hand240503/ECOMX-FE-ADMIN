@@ -13,19 +13,18 @@ import {
   AlertTriangle,
   Loader2,
   Info,
-  Package,
+  Layers,
   Plus,
   RefreshCw,
   Trash2,
   ArrowRight,
 } from 'lucide-react';
 import { adminProductService } from '../../api/services/adminProductService';
-import type { ProductImportResponse, ProductImportRowResult, ProductImportAction } from '../../api/types/product.types';
-import { ImportRowSelector } from './ImportRowSelector';
-import { useImportRowSelection } from './useImportRowSelection';
+import type { VariantImportResponse, ProductImportAction } from '../../api/types/product.types';
 
 type Props = {
   open: boolean;
+  productId: number | string;
   onClose: () => void;
   onImported?: () => void;
 };
@@ -48,38 +47,32 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function AdminProductImportModal({ open, onClose, onImported }: Props) {
+export function AdminVariantImportModal({ open, productId, onClose, onImported }: Props) {
   const [step, setStep] = useState<Step>('select');
   const [file, setFile] = useState<File | null>(null);
-  const [filteredFile, setFilteredFile] = useState<File | null>(null);
   const [previewing, setPreviewing] = useState(false);
-  const [parsing, setParsing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [preview, setPreview] = useState<ProductImportResponse | null>(null);
+  const [preview, setPreview] = useState<VariantImportResponse | null>(null);
   const [actions, setActions] = useState<Record<string, ProductImportAction>>({});
-  const [result, setResult] = useState<ProductImportResponse | null>(null);
+  const [result, setResult] = useState<VariantImportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const selection = useImportRowSelection();
 
   const reset = useCallback(() => {
     setStep('select');
     setFile(null);
-    setFilteredFile(null);
     setPreview(null);
     setActions({});
     setResult(null);
     setError(null);
     setPreviewing(false);
-    setParsing(false);
     setUploading(false);
     setDragOver(false);
-    selection.reset();
-  }, [selection]);
+  }, []);
 
-  const busy = previewing || uploading || parsing;
+  const busy = previewing || uploading;
   const handleClose = useCallback(() => {
     if (busy) return;
     reset();
@@ -95,44 +88,29 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open, handleClose]);
 
-  const pickFile = useCallback(
-    async (f: File | null) => {
-      setError(null);
-      if (!f) return;
-      if (!isValidFile(f.name)) {
-        setError('Chỉ chấp nhận file .xlsx, .xls, .csv hoặc .txt');
-        return;
-      }
-      setFile(f);
-      setParsing(true);
-      try {
-        const grid = await selection.parse(f);
-        if (grid.rows.length === 0) setError('File không có dòng dữ liệu nào để nhập.');
-      } catch {
-        setError('Không đọc được file. Kiểm tra lại định dạng .xlsx, .xls, .csv hoặc .txt');
-        setFile(null);
-        selection.reset();
-      } finally {
-        setParsing(false);
-      }
-    },
-    [selection]
-  );
+  const pickFile = useCallback((f: File | null) => {
+    setError(null);
+    if (!f) return;
+    if (!isValidFile(f.name)) {
+      setError('Chỉ chấp nhận file .xlsx, .xls, .csv hoặc .txt');
+      return;
+    }
+    setFile(f);
+  }, []);
 
   const clearFile = useCallback(() => {
     setFile(null);
     setError(null);
-    selection.reset();
-  }, [selection]);
+  }, []);
 
   const handleDownloadTemplate = useCallback(async () => {
     setDownloading(true);
     try {
-      const blob = await adminProductService.downloadImportTemplate();
+      const blob = await adminProductService.downloadVariantImportTemplate(productId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'mau_import_san_pham.xlsx';
+      a.download = 'mau_import_bien_the.xlsx';
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -142,19 +120,16 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
     } finally {
       setDownloading(false);
     }
-  }, []);
+  }, [productId]);
 
   // Bước 1 -> 2: phân tích & xem trước
   const handlePreview = useCallback(async () => {
-    if (!file || selection.selectedCount === 0) return;
+    if (!file) return;
     setPreviewing(true);
     setError(null);
     try {
-      const filtered = selection.buildFile(file.name);
-      setFilteredFile(filtered);
-      const res = await adminProductService.previewImportProducts(filtered);
+      const res = await adminProductService.previewImportVariants(productId, file);
       setPreview(res);
-      // Khởi tạo lựa chọn theo mặc định BE trả về (UPDATE nếu đã tồn tại, ngược lại CREATE).
       const init: Record<string, ProductImportAction> = {};
       for (const r of res.results) {
         if (r.success && r.key) init[r.key] = (r.action as ProductImportAction) ?? 'CREATE';
@@ -168,24 +143,23 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
     } finally {
       setPreviewing(false);
     }
-  }, [file, selection]);
+  }, [file, productId]);
 
   // Bước 2 -> 3: xác nhận import với lựa chọn
   const handleConfirm = useCallback(async () => {
-    const target = filteredFile ?? file;
-    if (!target) return;
+    if (!file) return;
     setUploading(true);
     setError(null);
     try {
-      const res = await adminProductService.importProducts(target, actions);
+      const res = await adminProductService.importVariants(productId, file, actions);
       setResult(res);
       setStep('result');
       const ok = (res.createdCount ?? 0) + (res.updatedCount ?? 0);
       if (ok > 0) {
-        toast.success(`Thêm mới ${res.createdCount ?? 0}, cập nhật ${res.updatedCount ?? 0}`);
+        toast.success(`Thêm mới ${res.createdCount ?? 0}, cập nhật ${res.updatedCount ?? 0} biến thể`);
         onImported?.();
       }
-      if (res.failureCount > 0) toast.error(`${res.failureCount} sản phẩm lỗi`);
+      if (res.failureCount > 0) toast.error(`${res.failureCount} biến thể lỗi`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Import thất bại';
       setError(msg);
@@ -193,7 +167,7 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
     } finally {
       setUploading(false);
     }
-  }, [file, filteredFile, actions, onImported]);
+  }, [file, productId, actions, onImported]);
 
   const setAction = useCallback((key: string, action: ProductImportAction) => {
     setActions((prev) => ({ ...prev, [key]: action }));
@@ -235,16 +209,16 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
         <div className="flex items-start justify-between gap-3 border-b border-[var(--bg-border)] px-6 py-5">
           <div className="flex items-center gap-3">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
-              <UploadCloud className="size-6" aria-hidden />
+              <Layers className="size-6" aria-hidden />
             </span>
             <div className="min-w-0">
               <h2 className="font-[family-name:var(--font-admin-heading)] text-lg font-semibold leading-tight text-[var(--text-primary)]">
-                Tải sản phẩm lên
+                Import biến thể
               </h2>
               <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                {step === 'select' && 'Chọn file → tích chọn dòng cần nhập → xem trước → thêm mới / cập nhật'}
-                {step === 'review' && 'Xem trước: chọn THÊM MỚI hoặc CẬP NHẬT cho từng sản phẩm'}
-                {step === 'result' && 'Kết quả import'}
+                {step === 'select' && 'Chọn file Excel biến thể → xem trước → thêm mới / cập nhật cho sản phẩm này'}
+                {step === 'review' && 'Xem trước: chọn THÊM MỚI hoặc CẬP NHẬT cho từng biến thể'}
+                {step === 'result' && 'Kết quả nạp biến thể'}
               </p>
             </div>
           </div>
@@ -268,9 +242,10 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
                 <div className="flex gap-3">
                   <Info className="mt-0.5 size-4 shrink-0 text-[var(--accent)]" aria-hidden />
                   <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
-                    Sau khi chọn file, bấm <b className="text-[var(--text-primary)]">Xem trước</b>. Sản phẩm đã có
-                    trong hệ thống sẽ mặc định <b className="text-[var(--text-primary)]">Cập nhật</b>, còn lại
-                    là <b className="text-[var(--text-primary)]">Thêm mới</b> — bạn có thể chỉnh từng dòng.
+                    File chỉ gồm cột <b className="text-[var(--text-primary)]">sku_code, option_values, sort_order,
+                    active</b>. Biến thể đã có (khớp sku_code hoặc bộ thuộc tính) sẽ mặc định{' '}
+                    <b className="text-[var(--text-primary)]">Cập nhật</b>, còn lại{' '}
+                    <b className="text-[var(--text-primary)]">Thêm mới</b>.
                   </p>
                 </div>
                 <button
@@ -315,7 +290,7 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
                   onDrop={(e) => {
                     e.preventDefault();
                     setDragOver(false);
-                    void pickFile(e.dataTransfer.files?.[0] ?? null);
+                    pickFile(e.dataTransfer.files?.[0] ?? null);
                   }}
                   onClick={() => inputRef.current?.click()}
                   className={clsx(
@@ -353,25 +328,8 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
                 type="file"
                 accept={ACCEPT_EXT.join(',')}
                 className="hidden"
-                onChange={(e) => void pickFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
               />
-
-              {parsing && (
-                <div className="flex items-center justify-center gap-2 rounded-xl border border-[var(--bg-border)] bg-[var(--bg-elevated)]/40 px-4 py-3 text-sm text-[var(--text-secondary)]">
-                  <Loader2 className="size-4 animate-spin" /> Đang đọc file…
-                </div>
-              )}
-
-              {file && !parsing && selection.grid.rows.length > 0 && (
-                <ImportRowSelector
-                  grid={selection.grid}
-                  selected={selection.selected}
-                  onToggle={selection.toggle}
-                  onSelectAll={selection.selectAll}
-                  onClearAll={selection.clearAll}
-                  note="Mỗi dòng là một sản phẩm. Bỏ tích những dòng bạn KHÔNG muốn nhập. Biến thể (phân loại) thêm sau ở trang chi tiết sản phẩm bằng chức năng 'Import biến thể'."
-                />
-              )}
             </>
           )}
 
@@ -379,14 +337,14 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
           {step === 'review' && preview && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <StatCard icon={<Package className="size-4" />} label="Tổng SP" value={preview.totalProducts} tone="muted" />
+                <StatCard icon={<Layers className="size-4" />} label="Tổng biến thể" value={preview.totalVariants} tone="muted" />
                 <StatCard icon={<Plus className="size-4" />} label="Thêm mới" value={chosenCreate} tone="accent" />
                 <StatCard icon={<RefreshCw className="size-4" />} label="Cập nhật" value={chosenUpdate} tone="success" />
                 <StatCard icon={<AlertTriangle className="size-4" />} label="Lỗi" value={reviewFails.length} tone="danger" />
               </div>
 
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-[var(--text-secondary)]">Chọn hành động cho từng sản phẩm:</p>
+                <p className="text-xs text-[var(--text-secondary)]">Chọn hành động cho từng biến thể:</p>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -411,7 +369,7 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
                     <thead className="sticky top-0 bg-[var(--bg-elevated)]/95 text-xs text-[var(--text-muted)] backdrop-blur">
                       <tr>
                         <th className="px-3 py-2 font-medium">Dòng</th>
-                        <th className="px-3 py-2 font-medium">Sản phẩm</th>
+                        <th className="px-3 py-2 font-medium">SKU / Thuộc tính</th>
                         <th className="px-3 py-2 font-medium">Trạng thái</th>
                         <th className="px-3 py-2 font-medium">Hành động</th>
                       </tr>
@@ -420,7 +378,12 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
                       {reviewRows.map((r, i) => (
                         <tr key={r.key ?? i} className="border-t border-[var(--bg-border)]/60">
                           <td className="px-3 py-2 text-[var(--text-muted)]">{r.rowNumber ?? '—'}</td>
-                          <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{r.productName ?? '—'}</td>
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-[var(--text-primary)]">{r.skuCode ?? '—'}</div>
+                            {r.optionsLabel ? (
+                              <div className="text-xs text-[var(--text-muted)]">{r.optionsLabel}</div>
+                            ) : null}
+                          </td>
                           <td className="px-3 py-2">
                             <span
                               className={clsx(
@@ -444,7 +407,7 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
                       {reviewFails.map((r, i) => (
                         <tr key={`f-${i}`} className="border-t border-[var(--bg-border)]/60 bg-[var(--danger)]/5">
                           <td className="px-3 py-2 text-[var(--text-muted)]">{r.rowNumber ?? '—'}</td>
-                          <td className="px-3 py-2 text-[var(--text-primary)]">{r.productName ?? '—'}</td>
+                          <td className="px-3 py-2 text-[var(--text-primary)]">{r.skuCode ?? r.optionsLabel ?? '—'}</td>
                           <td className="px-3 py-2" colSpan={2}>
                             <span className="inline-flex items-center gap-1 text-xs text-[var(--danger)]">
                               <AlertCircle className="size-3.5" /> {r.message ?? 'Lỗi'}
@@ -463,7 +426,7 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
           {step === 'result' && result && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <StatCard icon={<Package className="size-4" />} label="Tổng SP" value={result.totalProducts} tone="muted" />
+                <StatCard icon={<Layers className="size-4" />} label="Tổng" value={result.totalVariants} tone="muted" />
                 <StatCard icon={<Plus className="size-4" />} label="Thêm mới" value={result.createdCount ?? 0} tone="accent" />
                 <StatCard icon={<RefreshCw className="size-4" />} label="Cập nhật" value={result.updatedCount ?? 0} tone="success" />
                 <StatCard icon={<AlertTriangle className="size-4" />} label="Lỗi" value={result.failureCount} tone="danger" />
@@ -478,7 +441,7 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
                     <thead className="sticky top-0 bg-[var(--bg-elevated)]/95 text-xs text-[var(--text-muted)] backdrop-blur">
                       <tr>
                         <th className="px-4 py-2 font-medium">Dòng</th>
-                        <th className="px-4 py-2 font-medium">Sản phẩm</th>
+                        <th className="px-4 py-2 font-medium">SKU / Thuộc tính</th>
                         <th className="px-4 py-2 font-medium">Kết quả</th>
                       </tr>
                     </thead>
@@ -486,7 +449,12 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
                       {result.results.map((r, i) => (
                         <tr key={i} className="border-t border-[var(--bg-border)]/60">
                           <td className="px-4 py-2 text-[var(--text-muted)]">{r.rowNumber ?? '—'}</td>
-                          <td className="px-4 py-2 font-medium text-[var(--text-primary)]">{r.productName ?? '—'}</td>
+                          <td className="px-4 py-2">
+                            <div className="font-medium text-[var(--text-primary)]">{r.skuCode ?? '—'}</div>
+                            {r.optionsLabel ? (
+                              <div className="text-xs text-[var(--text-muted)]">{r.optionsLabel}</div>
+                            ) : null}
+                          </td>
                           <td className="px-4 py-2">
                             <span className="inline-flex items-center gap-2">
                               <span
@@ -535,15 +503,11 @@ export function AdminProductImportModal({ open, onClose, onImported }: Props) {
               <button
                 type="button"
                 onClick={() => void handlePreview()}
-                disabled={!file || busy || selection.selectedCount === 0}
+                disabled={!file || busy}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {previewing ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-                {previewing
-                  ? 'Đang phân tích…'
-                  : selection.selectedCount > 0
-                    ? `Xem trước (${selection.selectedCount})`
-                    : 'Xem trước'}
+                {previewing ? 'Đang phân tích…' : 'Xem trước'}
               </button>
             </>
           )}

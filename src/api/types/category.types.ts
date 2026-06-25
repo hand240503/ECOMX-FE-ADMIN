@@ -29,3 +29,14 @@ export type CreateCategoryRequest = {
 
 /** `PUT /admin/categories/{id}` — partial update */
 export type UpdateCategoryRequest = Partial<CreateCategoryRequest>;
+
+/** Kết quả xóa danh mục hàng loạt — khớp CategoryBulkDeleteResponse (BE). */
+export type CategoryBulkDeleteResponse = {
+  requested: number;
+  deleted: number;
+  /** Số sản phẩm đã được gỡ danh mục (set null). */
+  productsDetached: number;
+  /** Số danh mục con đã được đưa lên gốc (parent set null). */
+  childrenDetached: number;
+  notFoundIds: number[];
+};

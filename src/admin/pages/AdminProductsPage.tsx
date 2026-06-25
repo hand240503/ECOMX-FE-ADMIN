@@ -2,13 +2,12 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import toast from 'react-hot-toast';
-import { Download, Plus, Search, Upload, X } from 'lucide-react';
+import { Loader2, Lock, Plus, Search, X } from 'lucide-react';
 import { adminProductService } from '../../api/services/adminProductService';
 import { categoryService } from '../../api/services/categoryService';
 import { flattenCategories } from '../../lib/categoryCatalog';
 import { AdminProductsDataTable } from '../components/AdminProductsDataTable';
-import { AdminProductImportModal } from '../components/AdminProductImportModal';
+import { notify } from '../../utils/notify';
 
 export default function AdminProductsPage() {
   // ── URL params — page đồng bộ với ?page=N (1-based trong URL, 0-based nội bộ) ──
@@ -35,50 +34,7 @@ export default function AdminProductsPage() {
 
   const [limit, setLimit] = useState(10);
   const [categoryId, setCategoryId] = useState<number | ''>('');
-  const [importOpen, setImportOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const queryClient = useQueryClient();
-
-  const handleExport = useCallback(async () => {
-    setExporting(true);
-    try {
-      const blob = await adminProductService.exportProducts();
-      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '');
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `san_pham_export_${ts}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Xuất Excel thất bại');
-    } finally {
-      setExporting(false);
-    }
-  }, []);
-
-  const [exportingIncomplete, setExportingIncomplete] = useState(false);
-  const handleExportIncomplete = useCallback(async () => {
-    setExportingIncomplete(true);
-    try {
-      const blob = await adminProductService.exportIncompleteProducts();
-      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '');
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `san_pham_chua_hoan_thien_${ts}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Xuất sản phẩm chưa hoàn thiện thất bại');
-    } finally {
-      setExportingIncomplete(false);
-    }
-  }, []);
 
   // ── Search ──────────────────────────────────────────────────────────────
   const [searchRaw, setSearchRaw] = useState('');
@@ -172,55 +128,116 @@ export default function AdminProductsPage() {
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
   );
 
+  // ── Cổng ẩn: double-click tiêu đề → nhập mật khẩu super admin → xuất toàn bộ sản phẩm ──
+  const [gateOpen, setGateOpen] = useState(false);
+  const [gatePassword, setGatePassword] = useState('');
+  const [gateBusy, setGateBusy] = useState(false);
+  const gateInputRef = useRef<HTMLInputElement>(null);
+
+  const openGate = useCallback(() => {
+    setGateOpen(true);
+    setGatePassword('');
+    // focus ô mật khẩu sau khi render
+    queueMicrotask(() => gateInputRef.current?.focus());
+  }, []);
+
+  const closeGate = useCallback(() => {
+    setGateOpen(false);
+    setGatePassword('');
+  }, []);
+
+  const handleGateSubmit = useCallback(async () => {
+    const pwd = gatePassword.trim();
+    if (!pwd || gateBusy) return;
+    setGateBusy(true);
+    try {
+      const ok = await adminProductService.verifySuperAdmin(pwd);
+      if (!ok) {
+        notify.error('Mật khẩu super admin không đúng');
+        gateInputRef.current?.focus();
+        gateInputRef.current?.select();
+        return;
+      }
+      const blob = await adminProductService.exportProducts();
+      const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tat_ca_san_pham_${ts}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      notify.success('Đã xuất toàn bộ sản phẩm');
+      closeGate();
+    } catch {
+      notify.error('Xuất toàn bộ sản phẩm thất bại');
+    } finally {
+      setGateBusy(false);
+    }
+  }, [gatePassword, gateBusy, closeGate]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-[family-name:var(--font-admin-heading)] text-xl font-semibold text-[var(--text-primary)]">
+          <h1
+            onDoubleClick={openGate}
+            title="Sản phẩm"
+            className="select-none font-[family-name:var(--font-admin-heading)] text-xl font-semibold text-[var(--text-primary)]"
+          >
             Sản phẩm
           </h1>
+
+          {/* Cổng ẩn — chỉ hiện sau khi double-click vào tiêu đề */}
+          {gateOpen && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleGateSubmit();
+              }}
+              className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--bg-border)] bg-[var(--bg-surface)] p-2"
+            >
+              <Lock className="size-4 text-[var(--text-muted)]" aria-hidden />
+              <input
+                ref={gateInputRef}
+                type="password"
+                value={gatePassword}
+                onChange={(e) => setGatePassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') closeGate(); }}
+                placeholder="Mật khẩu super admin…"
+                autoComplete="off"
+                disabled={gateBusy}
+                className={clsx(inputCls, 'w-56')}
+                aria-label="Mật khẩu super admin để xuất toàn bộ sản phẩm"
+              />
+              <button
+                type="submit"
+                disabled={gateBusy || gatePassword.trim() === ''}
+                className={clsx(
+                  'inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white',
+                  'bg-[var(--accent)] hover:brightness-110',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]',
+                  'disabled:cursor-not-allowed disabled:opacity-50'
+                )}
+              >
+                {gateBusy ? <Loader2 className="size-4 animate-spin" /> : null}
+                {gateBusy ? 'Đang xuất…' : 'Xuất tất cả'}
+              </button>
+              <button
+                type="button"
+                onClick={closeGate}
+                disabled={gateBusy}
+                className="rounded p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:opacity-50"
+                aria-label="Đóng"
+              >
+                <X className="size-4" />
+              </button>
+            </form>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void handleExport()}
-            disabled={exporting}
-            className={clsx(
-              'inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2.5 text-sm font-semibold',
-              'text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] disabled:opacity-50',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
-            )}
-          >
-            <Download className="size-4" aria-hidden />
-            {exporting ? 'Đang xuất…' : 'Xuất Excel'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleExportIncomplete()}
-            disabled={exportingIncomplete}
-            title="Sản phẩm chưa có biến thể hoặc chưa có giá"
-            className={clsx(
-              'inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2.5 text-sm font-semibold',
-              'text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] disabled:opacity-50',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
-            )}
-          >
-            <Download className="size-4" aria-hidden />
-            {exportingIncomplete ? 'Đang xuất…' : 'Xuất SP chưa hoàn thiện'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setImportOpen(true)}
-            className={clsx(
-              'inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2.5 text-sm font-semibold',
-              'text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]'
-            )}
-          >
-            <Upload className="size-4" aria-hidden />
-            Tải sản phẩm lên
-          </button>
           <Link
             to="/admin/products/create"
             className={clsx(
@@ -234,15 +251,6 @@ export default function AdminProductsPage() {
           </Link>
         </div>
       </div>
-
-      <AdminProductImportModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImported={() => {
-          void queryClient.invalidateQueries({ queryKey: ['admin-products'] });
-          void queryClient.invalidateQueries({ queryKey: ['admin-products-search-all'] });
-        }}
-      />
 
       {/* Filter card */}
       <div className="flex flex-col gap-3 rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-4 sm:flex-row sm:flex-wrap sm:items-end">

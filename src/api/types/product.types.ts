@@ -368,3 +368,28 @@ export interface ProductImportResponse {
   createdVariantCount: number;
   results: ProductImportRowResult[];
 }
+
+/** Kết quả import một biến thể — khớp VariantImportRowResult (BE). */
+export interface VariantImportRowResult {
+  rowNumber: number | null;
+  skuCode: string | null;
+  optionsLabel: string | null;
+  key?: string | null;
+  action?: ProductImportAction | null;
+  exists?: boolean;
+  success: boolean;
+  variantId: number | null;
+  message: string | null;
+}
+
+/** Tổng hợp kết quả import biến thể — khớp VariantImportResponse (BE). */
+export interface VariantImportResponse {
+  productId: number | null;
+  totalVariants: number;
+  successCount: number;
+  createdCount?: number;
+  updatedCount?: number;
+  skippedCount?: number;
+  failureCount: number;
+  results: VariantImportRowResult[];
+}

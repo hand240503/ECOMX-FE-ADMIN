@@ -171,13 +171,24 @@ export const API_ENDPOINTS = {
     PRODUCTS_IMPORT: '/admin/products/import',
     PRODUCTS_IMPORT_PREVIEW: '/admin/products/import/preview',
     PRODUCTS_IMPORT_TEMPLATE: '/admin/products/import/template',
+    // Import biến thể (phân loại) cho MỘT sản phẩm (trang chi tiết)
+    PRODUCT_VARIANT_IMPORT: (productId: number | string) => `/admin/products/${productId}/variants/import`,
+    PRODUCT_VARIANT_IMPORT_PREVIEW: (productId: number | string) =>
+      `/admin/products/${productId}/variants/import/preview`,
+    PRODUCT_VARIANT_IMPORT_TEMPLATE: (productId: number | string) =>
+      `/admin/products/${productId}/variants/import/template`,
     PRODUCTS_EXPORT: '/admin/products/export',
     PRODUCTS_EXPORT_INCOMPLETE: '/admin/products/export/incomplete',
+    // Cổng ẩn: xác thực mật khẩu super admin trước khi xuất toàn bộ sản phẩm
+    PRODUCTS_VERIFY_SUPER_ADMIN: '/admin/products/verify-super-admin',
     // Đánh dấu nổi bật / hot-sale bằng Excel (multipart `file`) + tải file mẫu
     PRODUCTS_FEATURED_IMPORT: '/admin/products/featured/import',
     PRODUCTS_FEATURED_IMPORT_TEMPLATE: '/admin/products/featured/import/template',
     PRODUCTS_HOTSALE_IMPORT: '/admin/products/hot-sale/import',
     PRODUCTS_HOTSALE_IMPORT_TEMPLATE: '/admin/products/hot-sale/import/template',
+    // Gán danh mục / thương hiệu hàng loạt bằng Excel (cột sku + brand_code + category_code) + tải file mẫu
+    PRODUCTS_ASSIGN_CATALOG_IMPORT: '/admin/products/assign-catalog/import',
+    PRODUCTS_ASSIGN_CATALOG_IMPORT_TEMPLATE: '/admin/products/assign-catalog/import/template',
     // Brand import / export
     BRANDS_EXPORT: '/admin/brands/export',
     BRANDS_IMPORT: '/admin/brands/import',
@@ -186,6 +197,7 @@ export const API_ENDPOINTS = {
     CATEGORIES_EXPORT: '/admin/categories/export',
     CATEGORIES_IMPORT: '/admin/categories/import',
     CATEGORIES_IMPORT_PREVIEW: '/admin/categories/import/preview',
+    CATEGORIES_BULK_DELETE: '/admin/categories/bulk-delete',
     // Inventory import
     INVENTORY_IMPORT_EXCEL: '/admin/inventory/import/excel',
     INVENTORY_IMPORT_TEMPLATE: '/admin/inventory/import/template',
@@ -196,6 +208,9 @@ export const API_ENDPOINTS = {
     PROMO_PWP_IMPORT_TEMPLATE: '/admin/promotions/purchase-with-purchase/import/template',
     PROMO_VOLUME_TIER_IMPORT: '/admin/promotions/volume-price-tiers/import',
     PROMO_VOLUME_TIER_IMPORT_TEMPLATE: '/admin/promotions/volume-price-tiers/import/template',
+    // Promotion overview — liệt kê tất cả sản phẩm đang chạy chương trình
+    PROMO_PRICE_CHANGES_ALL: '/admin/promotions/price-changes',
+    PROMO_VOLUME_TIERS_ALL: '/admin/promotions/volume-price-tiers',
     // Order: xóa media trả hàng
     ORDER_DELETE_RETURN_MEDIA: (id: number | string, mediaId: number | string) =>
       `/admin/orders/${id}/return-media/${mediaId}`,
@@ -233,6 +248,7 @@ export const API_ENDPOINTS = {
     /** Brand catalog (hãng / thương hiệu) — @see docs/ADMIN_BRANDS.md */
     BRANDS: '/admin/brands',
     BRAND_BY_ID: (id: number | string) => `/admin/brands/${id}`,
+    BRANDS_BULK_DELETE: '/admin/brands/bulk-delete',
     /** Danh mục sản phẩm — @see docs/ADMIN_CATEGORIES.md */
     CATEGORIES: '/admin/categories',
     CATEGORY_BY_ID: (id: number | string) => `/admin/categories/${id}`,

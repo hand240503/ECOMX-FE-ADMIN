@@ -23,6 +23,11 @@ export function ImportRowSelector({ grid, selected, onToggle, onSelectAll, onCle
   const count = selected.size;
   const allSelected = count === total && total > 0;
 
+  // Ẩn cột "id" nội bộ khỏi bảng xem trước (giữ product_id). Chỉ ảnh hưởng hiển thị, không đổi file gửi lên.
+  const visibleCols = grid.headers
+    .map((h, i) => ({ header: h, index: i }))
+    .filter(({ header }) => (header ?? '').trim().toLowerCase() !== 'id');
+
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -68,9 +73,9 @@ export function ImportRowSelector({ grid, selected, onToggle, onSelectAll, onCle
                   </button>
                 </th>
                 <th className="w-12 px-2 py-2 font-medium">#</th>
-                {grid.headers.map((h, i) => (
-                  <th key={i} className="whitespace-nowrap px-3 py-2 font-medium">
-                    {h || `Cột ${i + 1}`}
+                {visibleCols.map(({ header, index }) => (
+                  <th key={index} className="whitespace-nowrap px-3 py-2 font-medium">
+                    {header || `Cột ${index + 1}`}
                   </th>
                 ))}
               </tr>
@@ -93,9 +98,9 @@ export function ImportRowSelector({ grid, selected, onToggle, onSelectAll, onCle
                       </span>
                     </td>
                     <td className="px-2 py-2 text-[var(--text-muted)]">{idx + 1}</td>
-                    {grid.headers.map((_, ci) => (
-                      <td key={ci} className="max-w-[16rem] truncate px-3 py-2 text-[var(--text-primary)]">
-                        {row[ci] ?? ''}
+                    {visibleCols.map(({ index }) => (
+                      <td key={index} className="max-w-[16rem] truncate px-3 py-2 text-[var(--text-primary)]">
+                        {row[index] ?? ''}
                       </td>
                     ))}
                   </tr>
@@ -103,7 +108,7 @@ export function ImportRowSelector({ grid, selected, onToggle, onSelectAll, onCle
               })}
               {grid.rows.length === 0 && (
                 <tr>
-                  <td colSpan={grid.headers.length + 2} className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">
+                  <td colSpan={visibleCols.length + 2} className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">
                     File không có dòng dữ liệu nào.
                   </td>
                 </tr>

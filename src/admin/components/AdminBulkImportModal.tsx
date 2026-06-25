@@ -37,6 +37,8 @@ type Props = {
   createdLabel?: string;
   /** Nhãn cho cột "cập nhật" (ẩn nếu không truyền). */
   updatedLabel?: string;
+  /** Ẩn ô thống kê "tạo mới" (dùng cho luồng chỉ cập nhật, ví dụ gán danh mục/thương hiệu). */
+  hideCreated?: boolean;
   /** Gọi lại sau khi import có ít nhất 1 dòng thành công. */
   onImported?: () => void;
 };
@@ -69,6 +71,7 @@ export function AdminBulkImportModal({
   templateFileName,
   createdLabel = 'Thành công',
   updatedLabel,
+  hideCreated = false,
   onImported,
 }: Props) {
   const [file, setFile] = useState<File | null>(null);
@@ -343,7 +346,9 @@ export function AdminBulkImportModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 <StatCard icon={<ListChecks className="size-4" />} label="Tổng dòng" value={result.totalRows} tone="muted" />
-                <StatCard icon={<CheckCircle2 className="size-4" />} label={createdLabel} value={result.createdCount} tone="success" />
+                {!hideCreated && (
+                  <StatCard icon={<CheckCircle2 className="size-4" />} label={createdLabel} value={result.createdCount} tone="success" />
+                )}
                 {updatedLabel && (
                   <StatCard icon={<CheckCircle2 className="size-4" />} label={updatedLabel} value={result.updatedCount} tone="accent" />
                 )}

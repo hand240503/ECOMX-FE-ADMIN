@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { Award, ImagePlus, Loader2, Search, Trash2, Upload, X } from 'lucide-react';
+import { Award, ImagePlus, Loader2, Search, Trash2, X } from 'lucide-react';
 import { adminBrandService } from '../../api/services/adminBrandService';
 import { adminDocumentService } from '../../api/services/adminDocumentService';
 import { DOCUMENT_ENTITY_TYPE_BRAND } from '../constants/documentEntities';
@@ -12,8 +12,6 @@ import { adminBrandPermissions } from '../../lib/adminBrandPermissions';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { notify } from '../../utils/notify';
 import { PricingPageHeader } from '../components/pricing/PricingPageHeader';
-import { ExportExcelButton } from '../components/ExportExcelButton';
-import { AdminCatalogImportModal } from '../components/AdminCatalogImportModal';
 import { AddFormShell } from '../components/pricing/AddFormShell';
 import { ADMIN_RECORD_STATUS_LABEL_VI, StatusBadge } from '../components/pricing/StatusBadge';
 
@@ -64,7 +62,6 @@ export default function AdminBrandsPage() {
 
   const [filter, setFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -255,30 +252,20 @@ export default function AdminBrandsPage() {
     if (!canDelete || selectedIds.size === 0) return;
     const ids = [...selectedIds];
     setBulkDeleting(true);
-    const succeeded = new Set<number>();
-    const failed = new Set<number>();
     try {
-      for (const id of ids) {
-        try { await adminBrandService.remove(id); succeeded.add(id); }
-        catch { failed.add(id); }
-      }
+      // Xóa hàng loạt 1 lượt: sản phẩm thuộc các hãng này được gỡ hãng (set null).
+      const res = await adminBrandService.bulkRemove(ids);
+      setSelectedIds(new Set());
+      await queryClient.invalidateQueries({ queryKey: ['admin-brands'] });
+      notify.success(`Đã xóa ${res.deleted} thương hiệu (gỡ ${res.productsDetached} sản phẩm)`);
+    } catch (e) {
+      setBulkErrorAlert({
+        title: 'Xóa hàng loạt thất bại',
+        message: getApiErrorMessage(e, 'Không xóa được thương hiệu đã chọn.'),
+      });
     } finally {
       setBulkDeleting(false);
       setBulkDeleteOpen(false);
-    }
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      succeeded.forEach((id) => next.delete(id));
-      return next;
-    });
-    await queryClient.invalidateQueries({ queryKey: ['admin-brands'] });
-    if (succeeded.size > 0) notify.success(`Đã xóa ${succeeded.size} hãng`);
-    if (failed.size > 0) {
-      const msg =
-        failed.size === ids.length
-          ? 'Không xóa được hãng đã chọn (có thể vẫn còn sản phẩm gắn hãng).'
-          : `Xóa được ${succeeded.size}, thất bại ${failed.size}. Kiểm tra sản phẩm đang dùng các hãng còn lại.`;
-      setBulkErrorAlert({ title: 'Một phần không xóa được', message: msg });
     }
   }, [canDelete, selectedIds, queryClient]);
 
@@ -299,24 +286,7 @@ export default function AdminBrandsPage() {
       <PricingPageHeader
         title="Hãng / Thương hiệu (Brand)"
         cta={headerCta}
-        extra={
-          <>
-            {canCreate && (
-              <button
-                type="button"
-                onClick={() => setImportOpen(true)}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--bg-border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-              >
-                <Upload className="size-4" aria-hidden />
-                Nhập Excel
-              </button>
-            )}
-            <ExportExcelButton fetcher={adminBrandService.exportXlsx} filePrefix="thuong_hieu_export" />
-          </>
-        }
       />
-
-      <AdminCatalogImportModal open={importOpen} onClose={() => setImportOpen(false)} kind="brand" />
 
       {/* ── Form modal ──────────────────────────────────────────────────────── */}
       <AddFormShell
@@ -659,7 +629,7 @@ export default function AdminBrandsPage() {
       <ConfirmDialog
         open={bulkDeleteOpen && canDelete && selectedCount > 0}
         title="Xóa các hãng đã chọn?"
-        message={`Bạn sắp xóa ${selectedCount} hãng đã tick. Thao tác không hoàn tác. Tiếp tục?`}
+        message={`Bạn sắp xóa ${selectedCount} hãng đã tick. Sản phẩm thuộc các hãng này sẽ được gỡ hãng (để trống), không bị xóa. Thao tác không hoàn tác. Tiếp tục?`}
         confirmLabel="Xóa"
         cancelLabel="Hủy"
         confirmVariant="danger"

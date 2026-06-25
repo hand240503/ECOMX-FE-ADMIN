@@ -1,7 +1,12 @@
 import { axiosInstance } from '../config/axiosConfig';
 import { API_ENDPOINTS } from '../config/apiEndpoints';
 import type { ApiResponse } from '../types/common.types';
-import type { CategoryResponse, CreateCategoryRequest, UpdateCategoryRequest } from '../types/category.types';
+import type {
+  CategoryBulkDeleteResponse,
+  CategoryResponse,
+  CreateCategoryRequest,
+  UpdateCategoryRequest,
+} from '../types/category.types';
 import type { CatalogImportResponse } from '../types/catalogImport.types';
 
 /**
@@ -88,6 +93,26 @@ export const adminCategoryService = {
       const errMsg = data.errors?.[0]?.message ?? data.message;
       throw new Error(typeof errMsg === 'string' && errMsg.trim() !== '' ? errMsg.trim() : 'Xóa danh mục thất bại');
     }
+  },
+
+  /**
+   * Xóa danh mục hàng loạt. Sản phẩm thuộc danh mục bị xóa được gỡ danh mục (set null),
+   * danh mục con được đưa lên gốc (parent set null).
+   */
+  async bulkRemove(ids: Array<number | string>, signal?: AbortSignal): Promise<CategoryBulkDeleteResponse> {
+    const numericIds = ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
+    const { data } = await axiosInstance.post<ApiResponse<CategoryBulkDeleteResponse>>(
+      API_ENDPOINTS.ADMIN.CATEGORIES_BULK_DELETE,
+      { ids: numericIds },
+      { signal }
+    );
+    if (data.success === false || data.data == null) {
+      const errMsg = data.errors?.[0]?.message ?? data.message;
+      throw new Error(
+        typeof errMsg === 'string' && errMsg.trim() !== '' ? errMsg.trim() : 'Xóa danh mục hàng loạt thất bại'
+      );
+    }
+    return data.data;
   },
 };
 

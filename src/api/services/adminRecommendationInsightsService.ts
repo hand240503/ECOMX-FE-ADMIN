@@ -59,6 +59,11 @@ export interface CbRecommendation {
   items: CbRecommendationItem[];
 }
 
+export interface EventStat {
+  event: string;
+  count: number;
+}
+
 export interface PageMeta {
   page: number;
   size: number;
@@ -165,5 +170,13 @@ export const adminRecommendationInsightsService = {
       },
     });
     return { content: res.data.data ?? [], meta: toMeta(res.data.metadata, size) };
+  },
+
+  /** Thống kê số lượt theo từng loại event trong collector_log (days = số ngày gần đây; 0 = tất cả). */
+  getEventStats: async (days = 30): Promise<EventStat[]> => {
+    const res = await axiosInstance.get<ApiEnvelope<EventStat[]>>(`${BASE}/event-stats`, {
+      params: { days },
+    });
+    return res.data.data ?? [];
   },
 };

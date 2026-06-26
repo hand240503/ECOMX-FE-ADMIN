@@ -5,17 +5,18 @@ import {
 } from 'recharts';
 import {
   Sparkles, Network, Star, UserCog, Wand2, Loader2, AlertCircle,
-  ChevronLeft, ChevronRight, Boxes, Users, Layers,
+  ChevronLeft, ChevronRight, Boxes, Users, Layers, Activity,
 } from 'lucide-react';
 import {
   adminRecommendationInsightsService as svc,
   type SimilarityAlgorithm,
 } from '../../api/services/adminRecommendationInsightsService';
 
-type TabKey = 'overview' | 'similarity' | 'ratings' | 'profiles' | 'cb';
+type TabKey = 'overview' | 'similarity' | 'ratings' | 'profiles' | 'cb' | 'events';
 
 const TABS: { key: TabKey; label: string; icon: typeof Sparkles }[] = [
   { key: 'overview', label: 'Tổng quan', icon: Sparkles },
+  { key: 'events', label: 'Tương tác User', icon: Activity },
   { key: 'similarity', label: 'Độ tương đồng', icon: Network },
   { key: 'ratings', label: 'Rating implicit', icon: Star },
   { key: 'profiles', label: 'Hồ sơ sở thích', icon: UserCog },
@@ -69,6 +70,7 @@ export default function AdminRecommendationInsightsPage() {
 
       <div className="flex-1 overflow-auto">
         {tab === 'overview' && <OverviewTab />}
+        {tab === 'events' && <EventsTab />}
         {tab === 'similarity' && <SimilarityTab />}
         {tab === 'ratings' && <RatingsTab />}
         {tab === 'profiles' && <ProfilesTab />}
@@ -202,6 +204,113 @@ function OverviewTab() {
           </ResponsiveContainer>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Tương tác User (collector_log) ──────────────────────────────────────────
+
+const EVENT_COLORS = [
+  '#059669', '#0284c7', '#d97706', '#06b6d4', '#c026d3',
+  '#e11d48', '#7c3aed', '#16a34a', '#f59e0b', '#0ea5e9',
+];
+
+function EventsTab() {
+  const [days, setDays] = useState(30);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['rec-insights', 'event-stats', days],
+    queryFn: () => svc.getEventStats(days),
+    placeholderData: keepPreviousData,
+  });
+
+  const rows = data ?? [];
+  const empty = !isLoading && !error && rows.length === 0;
+  const chartData = rows.map((r) => ({ name: r.event, value: r.count }));
+  const total = rows.reduce((s, r) => s + r.count, 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Biểu đồ tương tác người dùng (collector_log)
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            Mỗi cột là một loại sự kiện (event) · tổng {fmtInt(total)} lượt · {rows.length} loại
+          </p>
+        </div>
+        <select
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+        >
+          <option value={7}>7 ngày qua</option>
+          <option value={30}>30 ngày qua</option>
+          <option value={90}>90 ngày qua</option>
+          <option value={0}>Tất cả</option>
+        </select>
+      </div>
+
+      {isLoading || error || empty ? (
+        <StateBlock loading={isLoading} error={error} empty={empty} />
+      ) : (
+        <>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 40, left: 8 }}>
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11 }}
+                    interval={0}
+                    angle={-25}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                  <Tooltip formatter={(v: number) => fmtInt(v)} />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {chartData.map((_, i) => (
+                      <Cell key={i} fill={EVENT_COLORS[i % EVENT_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={tableWrap}>
+            <table className="min-w-full divide-y divide-slate-100 dark:divide-slate-700">
+              <thead>
+                <tr>
+                  <th className={thCls}>Sự kiện</th>
+                  <th className={thCls}>Số lượt</th>
+                  <th className={thCls}>Tỷ lệ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {rows.map((r, i) => (
+                  <tr key={r.event}>
+                    <td className={tdCls}>
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: EVENT_COLORS[i % EVENT_COLORS.length] }}
+                        />
+                        {r.event}
+                      </span>
+                    </td>
+                    <td className={`${tdCls} tabular-nums`}>{fmtInt(r.count)}</td>
+                    <td className={`${tdCls} tabular-nums`}>
+                      {total > 0 ? ((r.count / total) * 100).toFixed(1) : '0'}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

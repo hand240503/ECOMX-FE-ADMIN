@@ -7,6 +7,17 @@ import type { PurchaseWithPurchaseOffer, PurchaseWithPurchaseOfferUpsert } from 
 import type { ProductPriceChange } from '../types/product.types';
 import type { VolumePriceTier } from './adminProductService';
 
+/**
+ * Khung thời gian áp dụng cho 1 lần import — admin chọn sau khi xem review.
+ * `startAt`/`endAt` là ISO 8601 (vd "2026-07-01T00:00:00.000Z"). endAt null = không giới hạn.
+ * Thời gian KHÔNG nằm trong file Excel.
+ */
+export type ImportTimeWindow = { startAt: string; endAt?: string | null };
+
+function timeWindowFields(w: ImportTimeWindow): Record<string, string | null | undefined> {
+  return { startAt: w.startAt, endAt: w.endAt ?? undefined };
+}
+
 /** Chuẩn hóa 1 bậc giá volume từ BE (hỗ trợ cả snake_case product_id / product_variant_id). */
 function normalizeVolumeTier(raw: unknown): VolumePriceTier {
   const o = (raw ?? {}) as Record<string, unknown>;
@@ -121,25 +132,55 @@ export const adminPromotionService = {
 
   // ── Import bằng Excel/CSV/TXT ────────────────────────────────────────────
 
-  /** Import chương trình đổi giá (PC) từ file. */
-  async importPriceChanges(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
-    return postImportFile(API_ENDPOINTS.ADMIN.PROMO_PRICE_CHANGE_IMPORT, file, 'Nhập chương trình đổi giá thất bại', signal);
+  /** Import chương trình đổi giá (PC) từ file. Khung thời gian chọn sau review (không có trong file). */
+  async importPriceChanges(
+    file: File,
+    window: ImportTimeWindow,
+    signal?: AbortSignal
+  ): Promise<CatalogImportResponse> {
+    return postImportFile(
+      API_ENDPOINTS.ADMIN.PROMO_PRICE_CHANGE_IMPORT,
+      file,
+      'Nhập chương trình đổi giá thất bại',
+      signal,
+      timeWindowFields(window)
+    );
   },
   async downloadPriceChangeTemplate(signal?: AbortSignal): Promise<Blob> {
     return downloadTemplateBlob(API_ENDPOINTS.ADMIN.PROMO_PRICE_CHANGE_IMPORT_TEMPLATE, signal);
   },
 
-  /** Import chương trình mua kèm (PWP) từ file. */
-  async importPurchaseWithPurchase(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
-    return postImportFile(API_ENDPOINTS.ADMIN.PROMO_PWP_IMPORT, file, 'Nhập chương trình mua kèm thất bại', signal);
+  /** Import chương trình mua kèm (PWP) từ file. Khung thời gian chọn sau review (không có trong file). */
+  async importPurchaseWithPurchase(
+    file: File,
+    window: ImportTimeWindow,
+    signal?: AbortSignal
+  ): Promise<CatalogImportResponse> {
+    return postImportFile(
+      API_ENDPOINTS.ADMIN.PROMO_PWP_IMPORT,
+      file,
+      'Nhập chương trình mua kèm thất bại',
+      signal,
+      timeWindowFields(window)
+    );
   },
   async downloadPwpTemplate(signal?: AbortSignal): Promise<Blob> {
     return downloadTemplateBlob(API_ENDPOINTS.ADMIN.PROMO_PWP_IMPORT_TEMPLATE, signal);
   },
 
-  /** Import giá theo số lượng (Mix & Match / Volume tier) từ file. */
-  async importVolumeTiers(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
-    return postImportFile(API_ENDPOINTS.ADMIN.PROMO_VOLUME_TIER_IMPORT, file, 'Nhập giá theo số lượng thất bại', signal);
+  /** Import giá theo số lượng (Mix & Match / Volume tier) từ file. Khung thời gian chọn sau review. */
+  async importVolumeTiers(
+    file: File,
+    window: ImportTimeWindow,
+    signal?: AbortSignal
+  ): Promise<CatalogImportResponse> {
+    return postImportFile(
+      API_ENDPOINTS.ADMIN.PROMO_VOLUME_TIER_IMPORT,
+      file,
+      'Nhập giá theo số lượng thất bại',
+      signal,
+      timeWindowFields(window)
+    );
   },
   async downloadVolumeTierTemplate(signal?: AbortSignal): Promise<Blob> {
     return downloadTemplateBlob(API_ENDPOINTS.ADMIN.PROMO_VOLUME_TIER_IMPORT_TEMPLATE, signal);

@@ -4,6 +4,8 @@
  */
 
 export type InventoryStockResponse = {
+  storeId?: number | null;
+  storeName?: string | null;
   variantId: number;
   skuCode?: string | null;
   productId?: number | null;
@@ -21,11 +23,15 @@ export type InventoryMovementType =
   | 'RELEASE'
   | 'SALE_OUT'
   | 'RETURN_IN'
-  | 'RETURN_SCRAP';
+  | 'RETURN_SCRAP'
+  | 'TRANSFER_OUT'
+  | 'TRANSFER_IN';
 
 export type InventoryLedgerResponse = {
   id: number;
   variantId?: number | null;
+  storeId?: number | null;
+  storeName?: string | null;
   movementType: InventoryMovementType;
   quantity: number;
   sumBegin?: number | null;
@@ -37,6 +43,7 @@ export type InventoryLedgerResponse = {
 
 /** `POST /admin/inventory/import` */
 export type InventoryImportRequest = {
+  storeId: number;
   variantId: number;
   quantity: number;
   note?: string;
@@ -44,6 +51,7 @@ export type InventoryImportRequest = {
 
 /** `POST /admin/inventory/adjust` */
 export type InventoryAdjustRequest = {
+  storeId: number;
   variantId: number;
   onHand: number;
   note?: string;

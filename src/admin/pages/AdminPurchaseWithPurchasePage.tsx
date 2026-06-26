@@ -287,8 +287,9 @@ export default function AdminPurchaseWithPurchasePage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         title="Nhập chương trình mua kèm (PWP) từ Excel"
-        subtitle="Mỗi dòng = một ưu đãi mua kèm (anchor + companion theo variant_id hoặc sku_code)"
-        importFn={(f) => adminPromotionService.importPurchaseWithPurchase(f)}
+        subtitle="Mỗi dòng = một ưu đãi mua kèm (anchor + companion theo variant_id hoặc sku_code). Thời gian chọn sau khi xem review."
+        requireTimeWindow
+        importFn={(f, w) => adminPromotionService.importPurchaseWithPurchase(f, w!)}
         templateFn={() => adminPromotionService.downloadPwpTemplate()}
         templateFileName="mau_import_mua_kem.xlsx"
         onImported={() => void queryClient.invalidateQueries({ queryKey: ['admin-pwp-offers'] })}

@@ -23,6 +23,9 @@ export type VolumePriceTier = {
   minQuantity: number;
   unitPrice: number;
   enabled: boolean;
+  /** Khung thời gian áp dụng (ISO 8601). null/absent = không giới hạn. Chọn khi import. */
+  startAt?: string | null;
+  endAt?: string | null;
 };
 
 export interface AdminProductsListResult {

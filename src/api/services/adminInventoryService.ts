@@ -11,14 +11,15 @@ import type {
 } from '../types/inventory.types';
 
 /**
- * Admin quản lý kho — `/{api.prefix}/admin/inventory`.
- * Tồn kho ở cấp biến thể (SKU). @see docs/QUAN_LY_KHO_HANG.md
+ * Admin quản lý tồn kho ĐA KHO — `/{api.prefix}/admin/inventory`.
+ * Tồn kho ở cấp (kho × biến thể). @see docs/QUAN_LY_KHO_HANG.md
  */
 export const adminInventoryService = {
-  async listStocks(q?: string, signal?: AbortSignal): Promise<InventoryStockResponse[]> {
+  /** Tồn của tất cả biến thể trong MỘT kho. */
+  async listStocks(storeId: number, q?: string, signal?: AbortSignal): Promise<InventoryStockResponse[]> {
     const { data } = await axiosInstance.get<ApiResponse<InventoryStockResponse[]>>(
       API_ENDPOINTS.ADMIN.INVENTORY_STOCKS,
-      { params: q && q.trim() ? { q: q.trim() } : undefined, signal }
+      { params: { storeId, ...(q && q.trim() ? { q: q.trim() } : {}) }, signal }
     );
     if (data.success === false) {
       throw new Error(data.message?.trim() || 'Không tải được danh sách tồn kho');
@@ -26,9 +27,21 @@ export const adminInventoryService = {
     return Array.isArray(data.data) ? data.data : [];
   },
 
-  async getStock(variantId: number, signal?: AbortSignal): Promise<InventoryStockResponse> {
+  /** Tồn của một biến thể tại tất cả các kho. */
+  async listStocksByVariant(variantId: number, signal?: AbortSignal): Promise<InventoryStockResponse[]> {
+    const { data } = await axiosInstance.get<ApiResponse<InventoryStockResponse[]>>(
+      API_ENDPOINTS.ADMIN.INVENTORY_VARIANT_STORES(variantId),
+      { signal }
+    );
+    if (data.success === false) {
+      throw new Error(data.message?.trim() || 'Không tải được tồn kho theo kho');
+    }
+    return Array.isArray(data.data) ? data.data : [];
+  },
+
+  async getStock(storeId: number, variantId: number, signal?: AbortSignal): Promise<InventoryStockResponse> {
     const { data } = await axiosInstance.get<ApiResponse<InventoryStockResponse>>(
-      API_ENDPOINTS.ADMIN.INVENTORY_VARIANT_STOCK(variantId),
+      API_ENDPOINTS.ADMIN.INVENTORY_STORE_VARIANT_STOCK(storeId, variantId),
       { signal }
     );
     if (data.success === false || data.data == null) {
@@ -37,9 +50,9 @@ export const adminInventoryService = {
     return data.data;
   },
 
-  async getLedger(variantId: number, signal?: AbortSignal): Promise<InventoryLedgerResponse[]> {
+  async getLedger(storeId: number, variantId: number, signal?: AbortSignal): Promise<InventoryLedgerResponse[]> {
     const { data } = await axiosInstance.get<ApiResponse<InventoryLedgerResponse[]>>(
-      API_ENDPOINTS.ADMIN.INVENTORY_VARIANT_LEDGER(variantId),
+      API_ENDPOINTS.ADMIN.INVENTORY_STORE_VARIANT_LEDGER(storeId, variantId),
       { signal }
     );
     if (data.success === false) {
@@ -74,9 +87,14 @@ export const adminInventoryService = {
     return data.data;
   },
 
-  /** Import tồn kho hàng loạt từ file Excel/CSV/TXT (mode add = cộng thêm, set = đặt tuyệt đối). */
-  async importExcel(file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
-    return postImportFile(API_ENDPOINTS.ADMIN.INVENTORY_IMPORT_EXCEL, file, 'Nhập tồn kho thất bại', signal);
+  /** Import tồn kho hàng loạt vào MỘT kho từ file Excel/CSV/TXT. */
+  async importExcel(storeId: number, file: File, signal?: AbortSignal): Promise<CatalogImportResponse> {
+    return postImportFile(
+      `${API_ENDPOINTS.ADMIN.INVENTORY_IMPORT_EXCEL}?storeId=${storeId}`,
+      file,
+      'Nhập tồn kho thất bại',
+      signal
+    );
   },
 
   /** Tải file Excel mẫu để nhập tồn kho. */

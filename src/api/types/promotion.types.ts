@@ -10,6 +10,9 @@ export type PurchaseWithPurchaseOffer = {
   companionPromoUnitsPerAnchor: number;
   maxCompanionPromoUnits: number | null;
   enabled: boolean;
+  /** Khung thời gian áp dụng (ISO 8601). null/absent = không giới hạn. Chọn khi import. */
+  startAt?: string | null;
+  endAt?: string | null;
 };
 
 export type PurchaseWithPurchaseOfferUpsert = Omit<PurchaseWithPurchaseOffer, 'id'>;

@@ -259,8 +259,9 @@ export default function AdminMixAndMatchPage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         title="Nhập giá theo số lượng (Mix & Match) từ Excel"
-        subtitle="Mỗi dòng = một mốc giá theo số lượng cho một biến thể (variant_id hoặc sku_code)"
-        importFn={(f) => adminPromotionService.importVolumeTiers(f)}
+        subtitle="Mỗi dòng = một mốc giá theo số lượng cho một biến thể (variant_id hoặc sku_code). Thời gian chọn sau khi xem review."
+        requireTimeWindow
+        importFn={(f, w) => adminPromotionService.importVolumeTiers(f, w!)}
         templateFn={() => adminPromotionService.downloadVolumeTierTemplate()}
         templateFileName="mau_import_mix_match.xlsx"
         onImported={() => {

@@ -2,15 +2,25 @@ import { axiosInstance } from '../config/axiosConfig';
 import type { ApiResponse } from '../types/common.types';
 import type { CatalogImportResponse } from '../types/catalogImport.types';
 
-/** Gửi 1 file (multipart `file`) tới endpoint import, trả về CatalogImportResponse. */
+/**
+ * Gửi 1 file (multipart `file`) tới endpoint import, trả về CatalogImportResponse.
+ * `extraFields` cho phép gửi kèm các trường form khác (vd: startAt/endAt — khung thời gian
+ * admin chọn sau khi xem review; thời gian KHÔNG nằm trong file Excel).
+ */
 export async function postImportFile(
   url: string,
   file: File,
   fallbackMsg: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  extraFields?: Record<string, string | null | undefined>
 ): Promise<CatalogImportResponse> {
   const fd = new FormData();
   fd.append('file', file);
+  if (extraFields) {
+    for (const [k, v] of Object.entries(extraFields)) {
+      if (v != null && v !== '') fd.append(k, v);
+    }
+  }
   const { data } = await axiosInstance.post<ApiResponse<CatalogImportResponse>>(url, fd, {
     signal,
     timeout: 120_000,

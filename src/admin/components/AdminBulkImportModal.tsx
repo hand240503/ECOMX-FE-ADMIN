@@ -15,8 +15,10 @@ import {
   Info,
   ListChecks,
   Trash2,
+  CalendarClock,
 } from 'lucide-react';
 import type { CatalogImportResponse } from '../../api/types/catalogImport.types';
+import type { ImportTimeWindow } from '../../api/services/adminPromotionService';
 import { ImportRowSelector } from './ImportRowSelector';
 import { useImportRowSelection } from './useImportRowSelection';
 
@@ -27,8 +29,13 @@ type Props = {
   title: string;
   /** Mô tả ngắn dưới tiêu đề. */
   subtitle?: string;
-  /** Hàm gọi API import (multipart file). */
-  importFn: (file: File) => Promise<CatalogImportResponse>;
+  /** Hàm gọi API import (multipart file). `window` chỉ truyền khi `requireTimeWindow`. */
+  importFn: (file: File, window?: ImportTimeWindow) => Promise<CatalogImportResponse>;
+  /**
+   * Bật bước chọn khung thời gian SAU khi xem review (thời gian không nằm trong file).
+   * Khi bật: phải chọn "Bắt đầu" mới được nhập; thời gian áp cho tất cả dòng đã chọn.
+   */
+  requireTimeWindow?: boolean;
   /** Hàm tải file mẫu (blob). */
   templateFn: () => Promise<Blob>;
   /** Tên file mẫu khi tải về. */
@@ -73,6 +80,7 @@ export function AdminBulkImportModal({
   updatedLabel,
   hideCreated = false,
   onImported,
+  requireTimeWindow = false,
 }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -81,6 +89,8 @@ export function AdminBulkImportModal({
   const [dragOver, setDragOver] = useState(false);
   const [result, setResult] = useState<CatalogImportResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [startAtInput, setStartAtInput] = useState('');
+  const [endAtInput, setEndAtInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const selection = useImportRowSelection();
 
@@ -91,6 +101,8 @@ export function AdminBulkImportModal({
     setUploading(false);
     setParsing(false);
     setDragOver(false);
+    setStartAtInput('');
+    setEndAtInput('');
     selection.reset();
   }, [selection]);
 
@@ -163,12 +175,27 @@ export function AdminBulkImportModal({
 
   const handleUpload = useCallback(async () => {
     if (!file || selection.selectedCount === 0) return;
+    let timeWindow: ImportTimeWindow | undefined;
+    if (requireTimeWindow) {
+      if (!startAtInput) {
+        setError('Vui lòng chọn thời điểm bắt đầu áp dụng.');
+        return;
+      }
+      if (endAtInput && new Date(endAtInput).getTime() < new Date(startAtInput).getTime()) {
+        setError('Thời điểm kết thúc phải sau hoặc bằng thời điểm bắt đầu.');
+        return;
+      }
+      timeWindow = {
+        startAt: new Date(startAtInput).toISOString(),
+        endAt: endAtInput ? new Date(endAtInput).toISOString() : null,
+      };
+    }
     setUploading(true);
     setError(null);
     setResult(null);
     try {
       const filtered = selection.buildFile(file.name);
-      const res = await importFn(filtered);
+      const res = await importFn(filtered, timeWindow);
       setResult(res);
       const okCount = res.createdCount + res.updatedCount;
       if (okCount > 0) {
@@ -185,7 +212,7 @@ export function AdminBulkImportModal({
     } finally {
       setUploading(false);
     }
-  }, [file, selection, importFn, onImported]);
+  }, [file, selection, importFn, onImported, requireTimeWindow, startAtInput, endAtInput]);
 
   if (!open) return null;
   const portalTarget = resolvePortalTarget();
@@ -335,6 +362,42 @@ export function AdminBulkImportModal({
             />
           )}
 
+          {requireTimeWindow && file && !parsing && !result && selection.grid.rows.length > 0 && (
+            <div className="space-y-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <CalendarClock className="size-4 text-[var(--accent)]" aria-hidden />
+                Khung thời gian áp dụng
+              </div>
+              <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+                Thời gian không nằm trong file. Sau khi xem review ở trên, chọn thời gian áp dụng —
+                sẽ áp cho TẤT CẢ dòng được tích chọn.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  Bắt đầu <span className="text-[var(--danger)]">*</span>
+                  <input
+                    type="datetime-local"
+                    value={startAtInput}
+                    onChange={(e) => setStartAtInput(e.target.value)}
+                    className="rounded-lg border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  Kết thúc
+                  <input
+                    type="datetime-local"
+                    value={endAtInput}
+                    onChange={(e) => setEndAtInput(e.target.value)}
+                    className="rounded-lg border border-[var(--bg-border)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  />
+                  <span className="text-[10px] font-normal text-[var(--text-muted)]">
+                    Để trống = không giới hạn kết thúc.
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="flex items-start gap-2 rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -422,7 +485,13 @@ export function AdminBulkImportModal({
               <button
                 type="button"
                 onClick={() => void handleUpload()}
-                disabled={!file || parsing || uploading || selection.selectedCount === 0}
+                disabled={
+                  !file ||
+                  parsing ||
+                  uploading ||
+                  selection.selectedCount === 0 ||
+                  (requireTimeWindow && !startAtInput)
+                }
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--accent)]/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {uploading ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}

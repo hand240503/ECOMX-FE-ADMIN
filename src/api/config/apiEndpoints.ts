@@ -115,7 +115,13 @@ export const API_ENDPOINTS = {
   /** @see docs/API_SHIPPING_AND_ORDERS_UPDATE.md §1 */
   SHIPPING: {
     DISTANCE_TO_WAREHOUSE: '/shipping/distance-to-warehouse',
+    /** Danh sách kho + phí ship tới một địa chỉ (khách chọn store). */
+    STORES: '/shipping/stores',
+    DISTANCE_TO_STORE: '/shipping/distance-to-store',
   },
+
+  /** Kho công khai (web khách) — liệt kê store đang hoạt động. */
+  STORES: '/stores',
 
   /** @see docs/COLLECTOR_LOG_API.md */
   COLLECTOR_LOGS: '/collector-logs',
@@ -276,12 +282,19 @@ export const API_ENDPOINTS = {
     ORDER_BY_ID: (id: number | string) => `/admin/orders/${id}`,
     ORDER_UPDATE_STATUS: (id: number | string) => `/admin/orders/${id}/status`,
     ORDER_UPDATE_RETURN_STATUS: (id: number | string) => `/admin/orders/${id}/return-status`,
-    /** Quản lý kho — @see AdminInventoryController */
+    /** Quản lý kho đa kho — @see AdminInventoryController (store-scoped) */
     INVENTORY_STOCKS: '/admin/inventory/stocks',
-    INVENTORY_VARIANT_STOCK: (variantId: number | string) => `/admin/inventory/variants/${variantId}`,
-    INVENTORY_VARIANT_LEDGER: (variantId: number | string) => `/admin/inventory/variants/${variantId}/ledger`,
+    INVENTORY_VARIANT_STORES: (variantId: number | string) => `/admin/inventory/variants/${variantId}/stores`,
+    INVENTORY_STORE_VARIANT_STOCK: (storeId: number | string, variantId: number | string) =>
+      `/admin/inventory/stores/${storeId}/variants/${variantId}`,
+    INVENTORY_STORE_VARIANT_LEDGER: (storeId: number | string, variantId: number | string) =>
+      `/admin/inventory/stores/${storeId}/variants/${variantId}/ledger`,
     INVENTORY_IMPORT: '/admin/inventory/import',
     INVENTORY_ADJUST: '/admin/inventory/adjust',
+    /** Quản lý kho (store) CRUD + chuyển kho — @see AdminStoreController */
+    STORES: '/admin/stores',
+    STORE_BY_ID: (id: number | string) => `/admin/stores/${id}`,
+    STORE_TRANSFER: '/admin/stores/transfer',
     /** History / audit log — @see AdminHistoryController */
     HISTORY: '/admin/history',
     HISTORY_ORDER: (orderId: number | string) => `/admin/history/orders/${orderId}`,

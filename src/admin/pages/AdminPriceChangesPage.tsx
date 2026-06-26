@@ -638,8 +638,9 @@ export default function AdminPriceChangesPage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         title="Nhập chương trình đổi giá (PC) từ Excel"
-        subtitle="Mỗi dòng = một đợt đổi giá cho một biến thể (theo variant_id hoặc sku_code)"
-        importFn={(f) => adminPromotionService.importPriceChanges(f)}
+        subtitle="Mỗi dòng = một đợt đổi giá cho một biến thể (theo variant_id hoặc sku_code). Thời gian chọn sau khi xem review."
+        requireTimeWindow
+        importFn={(f, w) => adminPromotionService.importPriceChanges(f, w!)}
         templateFn={() => adminPromotionService.downloadPriceChangeTemplate()}
         templateFileName="mau_import_doi_gia.xlsx"
         onImported={() => {

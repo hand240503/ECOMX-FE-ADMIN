@@ -42,6 +42,7 @@ import AdminDepartmentListPage from '../../admin/pages/AdminDepartmentListPage';
 import AdminDepartmentFormPage from '../../admin/pages/AdminDepartmentFormPage';
 import ReportDashboardPage from '../../admin/pages/ReportDashboardPage';
 import ReportTopProductsPage from '../../admin/pages/ReportTopProductsPage';
+import AdminRecommendationInsightsPage from '../../admin/pages/AdminRecommendationInsightsPage';
 import AdminProfilePage from '../../admin/pages/AdminProfilePage';
 import { PermissionGate } from '../guards/PermissionGate';
 import { adminAccessControlUi } from '../../lib/adminAccessControlUi';
@@ -230,7 +231,7 @@ const router = createBrowserRouter(
         <Route
           path="warehouse"
           element={
-            <PermissionGate canView={adminAccessControlUi.canViewProducts}>
+            <PermissionGate canView={adminAccessControlUi.canViewStores}>
               <AdminWarehousePage />
             </PermissionGate>
           }
@@ -357,6 +358,14 @@ const router = createBrowserRouter(
           element={
             <PermissionGate canView={adminAccessControlUi.canViewReports}>
               <ReportTopProductsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="recommendation-insights"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewProducts}>
+              <AdminRecommendationInsightsPage />
             </PermissionGate>
           }
         />

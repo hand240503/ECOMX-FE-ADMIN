@@ -215,6 +215,9 @@ const EVENT_COLORS = [
   '#e11d48', '#7c3aed', '#16a34a', '#f59e0b', '#0ea5e9',
 ];
 
+// Các event ẩn khỏi biểu đồ tương tác.
+const HIDDEN_EVENTS = new Set(['genreView', 'addToList']);
+
 function EventsTab() {
   const [days, setDays] = useState(30);
   const { data, isLoading, error } = useQuery({
@@ -223,7 +226,7 @@ function EventsTab() {
     placeholderData: keepPreviousData,
   });
 
-  const rows = data ?? [];
+  const rows = (data ?? []).filter((r) => !HIDDEN_EVENTS.has(r.event));
   const empty = !isLoading && !error && rows.length === 0;
   const chartData = rows.map((r) => ({ name: r.event, value: r.count }));
   const total = rows.reduce((s, r) => s + r.count, 0);

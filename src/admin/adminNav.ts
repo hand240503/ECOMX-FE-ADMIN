@@ -14,6 +14,7 @@ import {
   Settings,
   Shield,
   ShoppingCart,
+  Store,
   Users,
   Warehouse,
 } from 'lucide-react';
@@ -125,6 +126,12 @@ export const adminNavSections: AdminNavSection[] = [
         to: '/admin/warehouse',
         label: 'Kho',
         icon: Warehouse,
+        visibilityCheck: () => adminAccessControlUi.canViewStores(),
+      },
+      {
+        to: '/admin/stores',
+        label: 'Cửa hàng (bản đồ)',
+        icon: Store,
         visibilityCheck: () => adminAccessControlUi.canViewStores(),
       },
       {

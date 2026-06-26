@@ -29,6 +29,7 @@ const pathTitleMap: Record<string, string> = {
   '/admin/categories': 'Danh mục',
   '/admin/orders': 'Đơn hàng',
   '/admin/warehouse': 'Kho',
+  '/admin/stores': 'Cửa hàng (bản đồ)',
   '/admin/staff': 'Nhân viên nội bộ',
   '/admin/staff/create': 'Tạo nhân viên nội bộ',
   '/admin/customers': 'Khách hàng',

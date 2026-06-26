@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
 import {
   Loader2, Search, PackagePlus, SlidersHorizontal, History, RefreshCw, Boxes, UploadCloud,
-  Store as StoreIcon, Plus, Pencil, Trash2, ArrowLeftRight, X,
+  Store as StoreIcon, Plus, ArrowLeftRight, X,
 } from 'lucide-react';
 import { adminInventoryService } from '../../api/services/adminInventoryService';
 import { adminStoreService } from '../../api/services/adminStoreService';
@@ -13,7 +13,7 @@ import type {
   InventoryLedgerResponse,
   InventoryMovementType,
 } from '../../api/types/inventory.types';
-import type { StoreResponse, StoreCreateRequest } from '../../api/types/store.types';
+import type { StoreResponse } from '../../api/types/store.types';
 import { notify } from '../../utils/notify';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { adminAccessControlUi } from '../../lib/adminAccessControlUi';
@@ -130,162 +130,6 @@ function LedgerModal({ storeId, variant, onClose }: { storeId: number; variant: 
           </table>
         </div>
       )}
-    </AddFormShell>
-  );
-}
-
-const emptyStoreForm: StoreCreateRequest = { code: '', name: '', phone: '', addressLine: '', city: '', note: '' };
-
-/** Modal CRUD kho / cửa hàng. */
-function StoreManageModal({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
-  const queryClient = useQueryClient();
-  const storesQuery = useQuery({ queryKey: ['admin-stores'], queryFn: ({ signal }) => adminStoreService.list(undefined, signal) });
-  const [editing, setEditing] = useState<StoreResponse | null>(null);
-  const [form, setForm] = useState<StoreCreateRequest>(emptyStoreForm);
-  const [saving, setSaving] = useState(false);
-  const canCreate = adminAccessControlUi.canCreateStores();
-  const canUpdate = adminAccessControlUi.canUpdateStores();
-  const canDelete = adminAccessControlUi.canDeleteStores();
-
-  const startEdit = (s: StoreResponse) => {
-    setEditing(s);
-    setForm({
-      code: s.code, name: s.name, phone: s.phone ?? '', addressLine: s.addressLine ?? '', city: s.city ?? '',
-      latitude: s.latitude ?? undefined, longitude: s.longitude ?? undefined, active: s.active, isDefault: s.isDefault, note: s.note ?? '',
-    });
-  };
-  const startCreate = () => { setEditing(null); setForm(emptyStoreForm); };
-
-  const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
-    onChanged();
-  };
-
-  const onSubmit = async () => {
-    if (!form.code.trim() || !form.name.trim()) { notify.error('Mã kho và tên kho là bắt buộc'); return; }
-    setSaving(true);
-    try {
-      const body: StoreCreateRequest = {
-        ...form,
-        code: form.code.trim(),
-        name: form.name.trim(),
-        latitude: form.latitude != null && !Number.isNaN(Number(form.latitude)) ? Number(form.latitude) : undefined,
-        longitude: form.longitude != null && !Number.isNaN(Number(form.longitude)) ? Number(form.longitude) : undefined,
-      };
-      if (editing) {
-        await adminStoreService.update(editing.id, body);
-        notify.success('Đã cập nhật kho');
-      } else {
-        await adminStoreService.create(body);
-        notify.success('Đã tạo kho');
-      }
-      await refresh();
-      startCreate();
-    } catch (e) {
-      notify.error(getApiErrorMessage(e, 'Lưu kho thất bại'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const onDelete = async (s: StoreResponse) => {
-    if (!window.confirm(`Xoá kho "${s.name}"? Chỉ xoá được khi kho không còn tồn và chưa gắn đơn.`)) return;
-    try {
-      await adminStoreService.remove(s.id);
-      notify.success('Đã xoá kho');
-      if (editing?.id === s.id) startCreate();
-      await refresh();
-    } catch (e) {
-      notify.error(getApiErrorMessage(e, 'Xoá kho thất bại'));
-    }
-  };
-
-  const stores = storesQuery.data ?? [];
-
-  return (
-    <AddFormShell
-      presentation="modal"
-      open
-      title="Quản lý kho / cửa hàng"
-      onClose={onClose}
-      footer={<button type="button" onClick={onClose} className={ghostBtn}>Đóng</button>}
-    >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Danh sách kho */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-[var(--text-secondary)]">Danh sách kho</p>
-            {canCreate && (
-              <button type="button" onClick={startCreate} className={ghostBtn}><Plus className="size-3.5" /> Thêm</button>
-            )}
-          </div>
-          {storesQuery.isLoading ? (
-            <p className="py-4 text-center text-sm text-[var(--text-muted)]">Đang tải…</p>
-          ) : stores.length === 0 ? (
-            <p className="py-4 text-center text-sm text-[var(--text-muted)]">Chưa có kho nào.</p>
-          ) : (
-            <ul className="max-h-[360px] divide-y divide-[var(--bg-border)]/70 overflow-auto rounded-lg border border-[var(--bg-border)]">
-              {stores.map((s) => (
-                <li key={s.id} className={clsx('flex items-center justify-between gap-2 px-3 py-2', editing?.id === s.id && 'bg-[var(--accent-soft)]')}>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                      {s.name}{' '}
-                      {s.isDefault && <span className="ml-1 rounded bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] text-[var(--accent)]">Mặc định</span>}
-                      {!s.active && <span className="ml-1 rounded bg-[var(--danger)]/10 px-1.5 py-0.5 text-[10px] text-[var(--danger)]">Ngừng</span>}
-                    </p>
-                    <p className="truncate text-[11px] text-[var(--text-muted)]">{s.code} · {s.city || s.addressLine || '—'}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {canUpdate && <button type="button" onClick={() => startEdit(s)} className="rounded p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"><Pencil className="size-3.5" /></button>}
-                    {canDelete && <button type="button" onClick={() => void onDelete(s)} className="rounded p-1.5 text-[var(--danger)] hover:bg-[var(--danger)]/10"><Trash2 className="size-3.5" /></button>}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Form thêm/sửa */}
-        {(canCreate || canUpdate) && (
-          <div className="space-y-3 rounded-lg border border-[var(--bg-border)] p-3">
-            <p className="text-xs font-semibold text-[var(--text-secondary)]">{editing ? `Sửa kho: ${editing.name}` : 'Thêm kho mới'}</p>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">Mã kho *
-                <input value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} className={inputCls} placeholder="HN01" />
-              </label>
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">Tên kho *
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={inputCls} placeholder="Kho Hà Nội" />
-              </label>
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">SĐT
-                <input value={form.phone ?? ''} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className={inputCls} />
-              </label>
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">Thành phố
-                <input value={form.city ?? ''} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} className={inputCls} />
-              </label>
-              <label className="col-span-2 flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">Địa chỉ
-                <input value={form.addressLine ?? ''} onChange={(e) => setForm((f) => ({ ...f, addressLine: e.target.value }))} className={inputCls} />
-              </label>
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">Vĩ độ (lat)
-                <input type="number" step="any" value={form.latitude ?? ''} onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value === '' ? undefined : Number(e.target.value) }))} className={inputCls} placeholder="21.0285" />
-              </label>
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">Kinh độ (lng)
-                <input type="number" step="any" value={form.longitude ?? ''} onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value === '' ? undefined : Number(e.target.value) }))} className={inputCls} placeholder="105.8542" />
-              </label>
-            </div>
-            <p className="text-[10px] text-[var(--text-muted)]">Toạ độ dùng để tính phí ship từ kho tới khách. Bỏ trống nếu chưa có.</p>
-            <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--text-secondary)]">
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.active ?? true} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} /> Đang hoạt động</label>
-              <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.isDefault ?? false} onChange={(e) => setForm((f) => ({ ...f, isDefault: e.target.checked }))} /> Đặt làm kho mặc định</label>
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => void onSubmit()} disabled={saving} className={primaryBtn}>
-                {saving && <Loader2 className="size-3.5 animate-spin" />} {editing ? 'Lưu' : 'Tạo kho'}
-              </button>
-              {editing && <button type="button" onClick={startCreate} className={ghostBtn}>Huỷ sửa</button>}
-            </div>
-          </div>
-        )}
-      </div>
     </AddFormShell>
   );
 }
@@ -437,7 +281,6 @@ export default function AdminWarehousePage() {
 
   const [ledgerTarget, setLedgerTarget] = useState<InventoryStockResponse | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [manageOpen, setManageOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
 
   const canUpdate = adminAccessControlUi.canUpdateStores();
@@ -542,7 +385,6 @@ export default function AdminWarehousePage() {
           </select>
         </label>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setManageOpen(true)} className={ghostBtn}><StoreIcon className="size-3.5" /> Quản lý kho</button>
           {canUpdate && stores.length >= 2 && (
             <button type="button" onClick={() => setTransferOpen(true)} className={ghostBtn}><ArrowLeftRight className="size-3.5" /> Chuyển kho</button>
           )}
@@ -551,7 +393,7 @@ export default function AdminWarehousePage() {
 
       {stores.length === 0 ? (
         <div className="rounded-xl border border-[var(--bg-border)] bg-[var(--bg-surface)] p-10 text-center text-sm text-[var(--text-muted)]">
-          Chưa có kho nào. Nhấn “Quản lý kho” để tạo kho đầu tiên.
+          Chưa có kho nào. Vào trang “Cửa hàng (bản đồ)” để tạo kho đầu tiên.
         </div>
       ) : (
         <>
@@ -696,7 +538,6 @@ export default function AdminWarehousePage() {
       </AddFormShell>
 
       {ledgerTarget && storeId != null && <LedgerModal storeId={storeId} variant={ledgerTarget} onClose={() => setLedgerTarget(null)} />}
-      {manageOpen && <StoreManageModal onClose={() => setManageOpen(false)} onChanged={() => { void storesQuery.refetch(); }} />}
       {transferOpen && storeId != null && (
         <TransferModal
           stores={stores.filter((s) => s.active)}

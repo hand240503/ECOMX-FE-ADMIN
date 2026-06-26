@@ -38,6 +38,7 @@ import AdminHistoryPage from '../../admin/pages/AdminHistoryPage';
 import AdminReturnOrdersPage from '../../admin/pages/AdminReturnOrdersPage';
 import AdminReturnDetailPage from '../../admin/pages/AdminReturnDetailPage';
 import AdminWarehousePage from '../../admin/pages/AdminWarehousePage';
+import AdminStoresPage from '../../admin/pages/AdminStoresPage';
 import AdminDepartmentListPage from '../../admin/pages/AdminDepartmentListPage';
 import AdminDepartmentFormPage from '../../admin/pages/AdminDepartmentFormPage';
 import ReportDashboardPage from '../../admin/pages/ReportDashboardPage';
@@ -233,6 +234,15 @@ const router = createBrowserRouter(
           element={
             <PermissionGate canView={adminAccessControlUi.canViewStores}>
               <AdminWarehousePage />
+            </PermissionGate>
+          }
+        />
+
+        <Route
+          path="stores"
+          element={
+            <PermissionGate canView={adminAccessControlUi.canViewStores}>
+              <AdminStoresPage />
             </PermissionGate>
           }
         />

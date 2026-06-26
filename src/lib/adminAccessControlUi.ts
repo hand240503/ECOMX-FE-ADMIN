@@ -63,7 +63,6 @@ const ROLE_DELETE = ['111', 'MANAGE_ROLE', '104', 'DELETE_ALL'] as const;
 const READ_ALL = ['102', 'READ_ALL'] as const;
 
 const PRODUCT_READ   = ['100002', ...READ_ALL] as const; // Sản phẩm
-const STORE_READ     = ['250002', ...READ_ALL] as const; // Kho / cửa hàng
 const STORE_CREATE   = ['250001', '101', 'CREATE_ALL'] as const;
 const STORE_UPDATE   = ['250003', '103', 'UPDATE_ALL'] as const;
 const STORE_DELETE   = ['250004', '104', 'DELETE_ALL'] as const;
@@ -115,9 +114,8 @@ export const adminAccessControlUi = {
   canViewProducts: (): boolean =>
     hasElevatedRole() || authService.hasAnyPermission([...PRODUCT_READ]),
 
-  /** Kho / cửa hàng (250xxx) */
-  canViewStores: (): boolean =>
-    hasElevatedRole() || authService.hasAnyPermission([...STORE_READ]),
+  /** Kho / cửa hàng — chỉ role cấp cao (SUPER_ADMIN / ADMIN / MANAGER) mới được xem. */
+  canViewStores: (): boolean => hasElevatedRole(),
   canCreateStores: (): boolean =>
     hasElevatedRole() || authService.hasAnyPermission([...STORE_CREATE]),
   canUpdateStores: (): boolean =>

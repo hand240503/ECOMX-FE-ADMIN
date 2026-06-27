@@ -216,7 +216,7 @@ const EVENT_COLORS = [
 ];
 
 // Các event ẩn khỏi biểu đồ tương tác.
-const HIDDEN_EVENTS = new Set(['genreView', 'addToList']);
+const HIDDEN_EVENTS = new Set(['genreView', 'addToList', 'addToCart']);
 
 function EventsTab() {
   const [days, setDays] = useState(30);

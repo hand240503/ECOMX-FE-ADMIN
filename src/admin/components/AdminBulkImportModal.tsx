@@ -372,7 +372,7 @@ export function AdminBulkImportModal({
                 Thời gian không nằm trong file. Sau khi xem review ở trên, chọn thời gian áp dụng —
                 sẽ áp cho TẤT CẢ dòng được tích chọn.
               </p>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3 items-start">
                 <label className="flex flex-col gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
                   Bắt đầu <span className="text-[var(--danger)]">*</span>
                   <input
